@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HR CA Dashboard - AI分析付きKPIダッシュボード</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap');
+  body { font-family: 'Noto Sans JP', sans-serif; background: #0f172a; color: #e2e8f0; }
+  .glass { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(100, 116, 139, 0.2); }
+  .glass-light { background: rgba(51, 65, 85, 0.5); backdrop-filter: blur(5px); border: 1px solid rgba(100, 116, 139, 0.15); }
+  .gradient-border { border-image: linear-gradient(135deg, #3b82f6, #8b5cf6) 1; }
+  .metric-card { transition: transform 0.2s, box-shadow 0.2s; }
+  .metric-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+  .insight-critical { border-left: 4px solid #ef4444; }
+  .insight-warning { border-left: 4px solid #f59e0b; }
+  .insight-success { border-left: 4px solid #10b981; }
+  .insight-info { border-left: 4px solid #3b82f6; }
+  .tab-active { background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; }
+  .tab-inactive { background: rgba(51, 65, 85, 0.5); color: #94a3b8; }
+  .tab-inactive:hover { background: rgba(71, 85, 105, 0.5); color: #e2e8f0; }
+  .progress-bar { background: linear-gradient(90deg, #3b82f6, #8b5cf6); }
+  .pulse-dot { animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+  canvas { max-height: 300px; }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Header -->
+<header class="glass sticky top-0 z-50 px-6 py-3 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm font-bold">HR</div>
+    <div>
+      <h1 class="text-lg font-bold text-white">CA Performance Dashboard</h1>
+      <p class="text-xs text-slate-400">AI分析付きKPIモニタリング</p>
+    </div>
+  </div>
+  <div class="flex items-center gap-4">
+    <div class="flex items-center gap-2 text-xs text-slate-400">
+      <span class="pulse-dot w-2 h-2 rounded-full bg-green-400 inline-block"></span>
+      <span id="lastUpdate">読み込み中...</span>
+    </div>
+    <button onclick="loadData()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition">更新</button>
+  </div>
+</header>
+
+<!-- Tab Navigation -->
+<nav class="px-6 py-3 flex gap-2 overflow-x-auto">
+  <button onclick="showTab('overview')" class="tab-btn tab-active px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition" data-tab="overview">四半期サマリー</button>
+  <button onclick="showTab('monthly')" class="tab-btn tab-inactive px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition" data-tab="monthly">月次トレンド</button>
+  <button onclick="showTab('ca-detail')" class="tab-btn tab-inactive px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition" data-tab="ca-detail">CA別分析</button>
+  <button onclick="showTab('funnel')" class="tab-btn tab-inactive px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition" data-tab="funnel">ファネル分析</button>
+  <button onclick="showTab('ai-insights')" class="tab-btn tab-inactive px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition" data-tab="ai-insights">AI分析・課題</button>
+</nav>
+
+<!-- Main Content -->
+<main class="px-6 pb-8">
+
+  <!-- Tab: Overview -->
+  <div id="tab-overview" class="tab-content">
+    <!-- KPI Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="glass rounded-xl p-4 metric-card">
+        <p class="text-xs text-slate-400 mb-1">今Q売上目標</p>
+        <p class="text-2xl font-bold text-white" id="kpi-budget">-</p>
+        <p class="text-xs text-slate-500 mt-1">粗利ベース</p>
+      </div>
+      <div class="glass rounded-xl p-4 metric-card">
+        <p class="text-xs text-slate-400 mb-1">実績</p>
+        <p class="text-2xl font-bold" id="kpi-actual">-</p>
+        <p class="text-xs mt-1" id="kpi-achievement">-</p>
+      </div>
+      <div class="glass rounded-xl p-4 metric-card">
+        <p class="text-xs text-slate-400 mb-1">面談数（実績/目標）</p>
+        <p class="text-2xl font-bold text-white" id="kpi-interviews">-</p>
+        <p class="text-xs mt-1" id="kpi-interview-rate">-</p>
+      </div>
+      <div class="glass rounded-xl p-4 metric-card">
+        <p class="text-xs text-slate-400 mb-1">決定数 / 決定率</p>
+        <p class="text-2xl font-bold text-white" id="kpi-decisions">-</p>
+        <p class="text-xs mt-1" id="kpi-decision-rate">-</p>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="glass rounded-xl p-4 mb-6">
+      <div class="flex justify-between items-center mb-2">
+        <span class="text-sm font-medium">四半期進捗</span>
+        <span class="text-sm" id="progress-label">-</span>
+      </div>
+      <div class="w-full bg-slate-700 rounded-full h-3 relative">
+        <div id="progress-bar-actual" class="h-3 rounded-full bg-gradient-to-r from-blue-500 to-blue-400 absolute" style="width:0%"></div>
+        <div id="progress-bar-time" class="h-3 border-r-2 border-yellow-400 absolute" style="left:0%"></div>
+      </div>
+      <div class="flex justify-between text-xs text-slate-500 mt-1">
+        <span>0%</span>
+        <span id="time-progress-label" class="text-yellow-400">日程進捗: -</span>
+        <span>100%</span>
+      </div>
+    </div>
+
+    <!-- Quarterly Comparison Chart -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div class="glass rounded-xl p-4">
+        <h3 class="text-sm font-semibold mb-3">四半期売上推移（目標 vs 実績）</h3>
+        <canvas id="chart-quarterly-sales"></canvas>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <h3 class="text-sm font-semibold mb-3">四半期決定数・面談数推移</h3>
+        <canvas id="chart-quarterly-metrics"></canvas>
+      </div>
+    </div>
+
+    <!-- CA Performance Table -->
+    <div class="glass rounded-xl p-4">
+      <h3 class="text-sm font-semibold mb-3">CA別 今Q実績サマリー</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-slate-400 border-b border-slate-700">
+              <th class="text-left py-2 px-3">CA</th>
+              <th class="text-right py-2 px-3">目標(万)</th>
+              <th class="text-right py-2 px-3">実績(万)</th>
+              <th class="text-right py-2 px-3">達成率</th>
+              <th class="text-right py-2 px-3">面談数</th>
+              <th class="text-right py-2 px-3">決定数</th>
+              <th class="text-right py-2 px-3">決定率</th>
+              <th class="text-left py-2 px-3">ステータス</th>
+            </tr>
+          </thead>
+          <tbody id="ca-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Monthly -->
+  <div id="tab-monthly" class="tab-content hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div class="glass rounded-xl p-4">
+        <h3 class="text-sm font-semibold mb-3">月次売上推移（直近12ヶ月）</h3>
+        <canvas id="chart-monthly-sales"></canvas>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <h3 class="text-sm font-semibold mb-3">月次面談数・決定数推移</h3>
+        <canvas id="chart-monthly-metrics"></canvas>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div class="glass rounded-xl p-4">
+        <h3 class="text-sm font-semibold mb-3">月次達成率推移</h3>
+        <canvas id="chart-monthly-achievement"></canvas>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <h3 class="text-sm font-semibold mb-3">月別MoM変化（売上）</h3>
+        <canvas id="chart-monthly-mom"></canvas>
+      </div>
+    </div>
+    <!-- Monthly Detail Table -->
+    <div class="glass rounded-xl p-4">
+      <h3 class="text-sm font-semibold mb-3">月次詳細データ</h3>
+      <div class="overflow-x-auto scrollbar-thin">
+        <table class="w-full text-sm">
+          <thead><tr class="text-slate-400 border-b border-slate-700" id="monthly-table-header"></tr></thead>
+          <tbody id="monthly-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: CA Detail -->
+  <div id="tab-ca-detail" class="tab-content hidden">
+    <div class="flex gap-2 mb-4 flex-wrap" id="ca-selector"></div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div class="glass rounded-xl p-4">
+        <h3 class="text-sm font-semibold mb-3">CA別 月次売上推移</h3>
+        <canvas id="chart-ca-sales"></canvas>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <h3 class="text-sm font-semibold mb-3">CA別 月次面談数推移</h3>
+        <canvas id="chart-ca-interviews"></canvas>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div class="glass rounded-xl p-4">
+        <h3 class="text-sm font-semibold mb-3">CA別 決定数推移</h3>
+        <canvas id="chart-ca-decisions"></canvas>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <h3 class="text-sm font-semibold mb-3">CA売上構成比</h3>
+        <canvas id="chart-ca-pie"></canvas>
+      </div>
+    </div>
+    <!-- CA Individual Detail -->
+    <div id="ca-detail-panel" class="glass rounded-xl p-4">
+      <h3 class="text-sm font-semibold mb-3" id="ca-detail-title">CA詳細</h3>
+      <div id="ca-detail-content"></div>
+    </div>
+  </div>
+
+  <!-- Tab: Funnel -->
+  <div id="tab-funnel" class="tab-content hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div class="glass rounded-xl p-4">
+        <h3 class="text-sm font-semibold mb-3">全体ファネル（直近Q）</h3>
+        <canvas id="chart-funnel"></canvas>
+      </div>
+      <div class="glass rounded-xl p-4">
+        <h3 class="text-sm font-semibold mb-3">コンバージョン率推移</h3>
+        <canvas id="chart-conversion"></canvas>
+      </div>
+    </div>
+    <div class="glass rounded-xl p-4 mb-6">
+      <h3 class="text-sm font-semibold mb-3">ファネル段階別コンバージョン率（月次）</h3>
+      <div class="overflow-x-auto scrollbar-thin">
+        <table class="w-full text-sm">
+          <thead><tr class="text-slate-400 border-b border-slate-700" id="funnel-table-header"></tr></thead>
+          <tbody id="funnel-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: AI Insights -->
+  <div id="tab-ai-insights" class="tab-content hidden">
+    <div class="mb-6">
+      <div class="flex items-center gap-2 mb-4">
+        <div class="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xs">AI</div>
+        <h2 class="text-lg font-bold">AI課題分析レポート</h2>
+      </div>
+      <p class="text-sm text-slate-400 mb-4">リードタイム（初回面談〜決定: 2-3ヶ月）を考慮した上での課題特定と予測分析です。直近2ヶ月のデータは暫定値として扱っています。</p>
+    </div>
+    <div id="insights-container" class="space-y-3"></div>
+
+    <!-- Prediction Section -->
+    <div class="glass rounded-xl p-5 mt-6">
+      <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
+        <span class="text-purple-400">&#9733;</span> 四半期着地予測
+      </h3>
+      <div id="prediction-content"></div>
+    </div>
+
+    <!-- CA Individual Analysis -->
+    <div class="glass rounded-xl p-5 mt-6">
+      <h3 class="text-sm font-semibold mb-3">CA別 課題マトリクス</h3>
+      <div id="ca-matrix" class="overflow-x-auto"></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+let DATA = null;
+let charts = {};
+const CA_COLORS = {
+  '辰巳': '#3b82f6', '黒川': '#8b5cf6', '渡辺': '#06b6d4',
+  '古谷': '#f59e0b', '嘉重': '#10b981', '百石': '#ef4444',
+  '百瀬': '#ec4899', '石丸': '#f97316', '合計': '#6366f1'
+};
+
+function showTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(el => {
+    el.classList.remove('tab-active');
+    el.classList.add('tab-inactive');
+  });
+  document.getElementById('tab-' + tabId).classList.remove('hidden');
+  document.querySelector(`[data-tab="${tabId}"]`).classList.remove('tab-inactive');
+  document.querySelector(`[data-tab="${tabId}"]`).classList.add('tab-active');
+  window.scrollTo(0, 0);
+  // Force chart resize after tab switch
+  setTimeout(() => { Object.values(charts).forEach(c => { c.resize(); c.update(); }); }, 100);
+}
+
+function fmt(n, decimals = 0) {
+  if (n === null || n === undefined || isNaN(n)) return '-';
+  return Number(n).toLocaleString('ja-JP', { maximumFractionDigits: decimals });
+}
+
+function fmtMan(n) {
+  if (!n || isNaN(n)) return '-';
+  return (n / 10000).toLocaleString('ja-JP', { maximumFractionDigits: 0 }) + '万';
+}
+
+function fmtPct(n) {
+  if (n === null || n === undefined || isNaN(n)) return '-';
+  let v = n;
+  if (Math.abs(v) <= 1 && Math.abs(v) > 0) v = v * 100;
+  return v.toFixed(1) + '%';
+}
+
+function sanitizeDecision(val) {
+  // Fix anomalous values (formula errors in source)
+  if (val > 1000) return 0;
+  return val;
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function createChart(id, config) {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  config.options = config.options || {};
+  config.options.responsive = true;
+  config.options.maintainAspectRatio = false;
+  config.options.plugins = config.options.plugins || {};
+  config.options.plugins.legend = config.options.plugins.legend || { labels: { color: '#94a3b8', font: { size: 11 } } };
+  config.options.scales = config.options.scales || {};
+  if (config.type !== 'doughnut' && config.type !== 'pie') {
+    config.options.scales.x = config.options.scales.x || { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(100,116,139,0.1)' } };
+    config.options.scales.y = config.options.scales.y || { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: 'rgba(100,116,139,0.1)' } };
+  }
+  ctx.parentElement.style.position = 'relative';
+  ctx.parentElement.style.height = '280px';
+  charts[id] = new Chart(ctx, config);
+}
+
+function loadData() {
+  fetch('data/dashboard_data.json')
+    .then(r => r.json())
+    .then(data => {
+      DATA = data;
+      document.getElementById('lastUpdate').textContent = '最終更新: ' + data.generated_at;
+      renderOverview();
+      renderMonthly();
+      renderCADetail();
+      renderFunnel();
+      renderInsights();
+    })
+    .catch(e => {
+      console.error('Data load error:', e);
+      document.getElementById('lastUpdate').textContent = 'データ読み込みエラー';
+    });
+}
+
+function renderOverview() {
+  const kpi = DATA.kpi;
+  const budget = kpi.q_budget.total;
+  const actual = kpi.q_actual.total;
+  const achievement = kpi.achievement_rate.total;
+  const qProgress = kpi.q_progress;
+
+  document.getElementById('kpi-budget').textContent = fmtMan(budget);
+  document.getElementById('kpi-actual').textContent = fmtMan(actual);
+  document.getElementById('kpi-actual').className = 'text-2xl font-bold ' + (achievement >= qProgress ? 'text-green-400' : 'text-yellow-400');
+  document.getElementById('kpi-achievement').textContent = `達成率: ${fmtPct(achievement)}`;
+  document.getElementById('kpi-achievement').className = 'text-xs mt-1 ' + (achievement >= qProgress ? 'text-green-400' : 'text-yellow-400');
+
+  const intActual = kpi.interview_actual.total;
+  const intTarget = kpi.interview_target.total;
+  document.getElementById('kpi-interviews').textContent = `${fmt(intActual)} / ${fmt(intTarget)}`;
+  const intRate = intTarget > 0 ? intActual / intTarget : 0;
+  document.getElementById('kpi-interview-rate').textContent = `達成率: ${fmtPct(intRate)}`;
+  document.getElementById('kpi-interview-rate').className = 'text-xs mt-1 ' + (intRate >= 1 ? 'text-green-400' : intRate >= 0.8 ? 'text-yellow-400' : 'text-red-400');
+
+  const decCount = sanitizeDecision(kpi.decision_count.total);
+  const decRate = kpi.decision_rate.total;
+  document.getElementById('kpi-decisions').textContent = `${fmt(decCount)}件`;
+  document.getElementById('kpi-decision-rate').textContent = `決定率: ${fmtPct(decRate)}`;
+
+  // Progress bar
+  document.getElementById('progress-bar-actual').style.width = Math.min(achievement * 100, 100) + '%';
+  document.getElementById('progress-bar-time').style.left = Math.min(qProgress * 100, 100) + '%';
+  document.getElementById('progress-label').textContent = `売上達成: ${fmtPct(achievement)} | 着地見込: ${fmtMan(kpi.landing_estimate.total)}`;
+  document.getElementById('time-progress-label').textContent = `日程進捗: ${fmtPct(qProgress)}`;
+
+  // Quarterly chart
+  const qData = DATA.quarterly_trends;
+  const qLabels = Object.keys(qData).filter(k => k.includes('FY25') || k === 'FY26／1Q');
+  createChart('chart-quarterly-sales', {
+    type: 'bar',
+    data: {
+      labels: qLabels.map(l => l.replace('FY25／', 'Q').replace('FY26／', 'FY26 Q').replace('／', ' ')),
+      datasets: [
+        { label: '目標', data: qLabels.map(q => qData[q].target / 10000), backgroundColor: 'rgba(100,116,139,0.3)', borderColor: '#64748b', borderWidth: 1 },
+        { label: '実績', data: qLabels.map(q => qData[q].actual / 10000), backgroundColor: 'rgba(59,130,246,0.6)', borderColor: '#3b82f6', borderWidth: 1 },
+        { label: '着地見込', data: qLabels.map(q => qData[q].landing / 10000), backgroundColor: 'rgba(139,92,246,0.3)', borderColor: '#8b5cf6', borderWidth: 1, borderDash: [5, 5] },
+      ]
+    },
+    options: { scales: { y: { title: { display: true, text: '万円', color: '#64748b' } } } }
+  });
+
+  createChart('chart-quarterly-metrics', {
+    type: 'bar',
+    data: {
+      labels: qLabels.map(l => l.replace('FY25／', 'Q').replace('FY26／', 'FY26 Q')),
+      datasets: [
+        { label: '面談数', data: qLabels.map(q => qData[q].interviews), backgroundColor: 'rgba(6,182,212,0.5)', borderColor: '#06b6d4', borderWidth: 1, yAxisID: 'y' },
+        { label: '決定数', data: qLabels.map(q => qData[q].decisions), type: 'line', borderColor: '#f59e0b', backgroundColor: '#f59e0b', pointRadius: 4, yAxisID: 'y1' },
+      ]
+    },
+    options: {
+      scales: {
+        y: { position: 'left', title: { display: true, text: '面談数', color: '#64748b' } },
+        y1: { position: 'right', title: { display: true, text: '決定数', color: '#64748b' }, grid: { drawOnChartArea: false } },
+      }
+    }
+  });
+
+  // CA Table
+  const tbody = document.getElementById('ca-table-body');
+  tbody.innerHTML = '';
+  const caComp = DATA.ca_comparison;
+  const sortedCAs = Object.entries(caComp).sort((a, b) => (b[1].actual || 0) - (a[1].actual || 0));
+  sortedCAs.forEach(([ca, d]) => {
+    const ach = d.achievement;
+    const dec = sanitizeDecision(d.decisions);
+    const decRate = d.interviews > 0 ? dec / d.interviews : 0;
+    let statusHtml = '';
+    if (ach >= qProgress) statusHtml = '<span class="px-2 py-0.5 bg-green-900/50 text-green-400 rounded text-xs">順調</span>';
+    else if (ach >= qProgress * 0.7) statusHtml = '<span class="px-2 py-0.5 bg-yellow-900/50 text-yellow-400 rounded text-xs">注意</span>';
+    else statusHtml = '<span class="px-2 py-0.5 bg-red-900/50 text-red-400 rounded text-xs">要改善</span>';
+
+    tbody.innerHTML += `<tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
+      <td class="py-2 px-3 font-medium" style="color:${CA_COLORS[ca] || '#e2e8f0'}">${ca}</td>
+      <td class="text-right py-2 px-3">${fmtMan(d.budget)}</td>
+      <td class="text-right py-2 px-3">${fmtMan(d.actual)}</td>
+      <td class="text-right py-2 px-3 ${ach >= qProgress ? 'text-green-400' : ach >= qProgress*0.7 ? 'text-yellow-400' : 'text-red-400'}">${fmtPct(ach)}</td>
+      <td class="text-right py-2 px-3">${fmt(d.interviews)}</td>
+      <td class="text-right py-2 px-3">${fmt(dec)}</td>
+      <td class="text-right py-2 px-3">${fmtPct(decRate)}</td>
+      <td class="py-2 px-3">${statusHtml}</td>
+    </tr>`;
+  });
+}
+
+function renderMonthly() {
+  const monthly = DATA.monthly_trends;
+  const allMonths = Object.keys(monthly);
+  // Show last 12 months with data
+  const activeMonths = allMonths.filter(m => monthly[m].actual > 0).slice(-12);
+  const labels = activeMonths.map(m => m.replace('年', '/').replace('月', ''));
+
+  createChart('chart-monthly-sales', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: '目標', data: activeMonths.map(m => monthly[m].target / 10000), backgroundColor: 'rgba(100,116,139,0.3)', borderColor: '#64748b', borderWidth: 1 },
+        { label: '実績', data: activeMonths.map(m => monthly[m].actual / 10000), backgroundColor: 'rgba(59,130,246,0.6)', borderColor: '#3b82f6', borderWidth: 1 },
+      ]
+    },
+    options: { scales: { y: { title: { display: true, text: '万円', color: '#64748b' } } } }
+  });
+
+  createChart('chart-monthly-metrics', {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: '面談数', data: activeMonths.map(m => monthly[m].interviews), borderColor: '#06b6d4', backgroundColor: 'rgba(6,182,212,0.1)', fill: true, yAxisID: 'y' },
+        { label: '決定数', data: activeMonths.map(m => monthly[m].decisions), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: true, yAxisID: 'y1' },
+      ]
+    },
+    options: {
+      scales: {
+        y: { position: 'left', title: { display: true, text: '面談数', color: '#64748b' } },
+        y1: { position: 'right', grid: { drawOnChartArea: false } },
+      }
+    }
+  });
+
+  // Achievement rate chart
+  const achRates = activeMonths.map(m => monthly[m].target > 0 ? (monthly[m].actual / monthly[m].target) * 100 : 0);
+  createChart('chart-monthly-achievement', {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '達成率(%)',
+        data: achRates,
+        borderColor: '#8b5cf6',
+        backgroundColor: 'rgba(139,92,246,0.1)',
+        fill: true,
+        pointRadius: 4,
+      }, {
+        label: '100%ライン',
+        data: activeMonths.map(() => 100),
+        borderColor: '#ef4444',
+        borderDash: [5, 5],
+        pointRadius: 0,
+      }]
+    }
+  });
+
+  // MoM change
+  const momChanges = activeMonths.map((m, i) => {
+    if (i === 0) return 0;
+    const prev = monthly[activeMonths[i - 1]].actual;
+    const cur = monthly[m].actual;
+    return prev > 0 ? ((cur - prev) / prev) * 100 : 0;
+  });
+  createChart('chart-monthly-mom', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'MoM変化率(%)',
+        data: momChanges,
+        backgroundColor: momChanges.map(v => v >= 0 ? 'rgba(16,185,129,0.6)' : 'rgba(239,68,68,0.6)'),
+        borderColor: momChanges.map(v => v >= 0 ? '#10b981' : '#ef4444'),
+        borderWidth: 1,
+      }]
+    }
+  });
+
+  // Monthly table
+  const header = document.getElementById('monthly-table-header');
+  header.innerHTML = '<th class="text-left py-2 px-3">月</th><th class="text-right py-2 px-3">目標(万)</th><th class="text-right py-2 px-3">実績(万)</th><th class="text-right py-2 px-3">達成率</th><th class="text-right py-2 px-3">面談数</th><th class="text-right py-2 px-3">決定数</th>';
+  const mtbody = document.getElementById('monthly-table-body');
+  mtbody.innerHTML = '';
+  activeMonths.slice().reverse().forEach(m => {
+    const d = monthly[m];
+    const ach = d.target > 0 ? d.actual / d.target : 0;
+    mtbody.innerHTML += `<tr class="border-b border-slate-700/50">
+      <td class="py-2 px-3">${m}</td>
+      <td class="text-right py-2 px-3">${fmtMan(d.target)}</td>
+      <td class="text-right py-2 px-3">${fmtMan(d.actual)}</td>
+      <td class="text-right py-2 px-3 ${ach >= 1 ? 'text-green-400' : 'text-yellow-400'}">${fmtPct(ach)}</td>
+      <td class="text-right py-2 px-3">${fmt(d.interviews)}</td>
+      <td class="text-right py-2 px-3">${fmt(d.decisions)}</td>
+    </tr>`;
+  });
+}
+
+function renderCADetail() {
+  const caNames = DATA.kpi.ca_names;
+  const selector = document.getElementById('ca-selector');
+  selector.innerHTML = '';
+  caNames.forEach(ca => {
+    selector.innerHTML += `<button onclick="selectCA('${ca}')" class="ca-btn px-3 py-1.5 rounded-lg text-sm font-medium transition" style="background:${CA_COLORS[ca]}33;color:${CA_COLORS[ca]};border:1px solid ${CA_COLORS[ca]}44" data-ca="${ca}">${ca}</button>`;
+  });
+
+  // CA monthly sales chart
+  const salesByCA = DATA.sales_by_ca;
+  const allMonths = Object.keys(DATA.monthly_trends).filter(m => DATA.monthly_trends[m].actual > 0).slice(-12);
+  const labels = allMonths.map(m => m.replace('年', '/').replace('月', ''));
+
+  const salesDatasets = caNames.map(ca => {
+    const caSales = salesByCA[ca];
+    return {
+      label: ca,
+      data: allMonths.map(m => {
+        if (!caSales || !caSales.monthly || !caSales.monthly[m]) return 0;
+        return (caSales.monthly[m]['実績(粗利)'] || 0) / 10000;
+      }),
+      borderColor: CA_COLORS[ca],
+      backgroundColor: CA_COLORS[ca] + '20',
+      borderWidth: 2,
+      pointRadius: 2,
+    };
+  });
+
+  createChart('chart-ca-sales', { type: 'line', data: { labels, datasets: salesDatasets } });
+
+  // CA interviews
+  const intDatasets = caNames.map(ca => {
+    const caSales = salesByCA[ca];
+    return {
+      label: ca,
+      data: allMonths.map(m => {
+        if (!caSales || !caSales.monthly || !caSales.monthly[m]) return 0;
+        return caSales.monthly[m]['面談数'] || 0;
+      }),
+      borderColor: CA_COLORS[ca],
+      borderWidth: 2,
+      pointRadius: 2,
+    };
+  });
+
+  createChart('chart-ca-interviews', { type: 'line', data: { labels, datasets: intDatasets } });
+
+  // CA decisions
+  const decDatasets = caNames.map(ca => {
+    const caSales = salesByCA[ca];
+    return {
+      label: ca,
+      data: allMonths.map(m => {
+        if (!caSales || !caSales.monthly || !caSales.monthly[m]) return 0;
+        return caSales.monthly[m]['決定数'] || 0;
+      }),
+      borderColor: CA_COLORS[ca],
+      borderWidth: 2,
+      pointRadius: 2,
+    };
+  });
+
+  createChart('chart-ca-decisions', { type: 'line', data: { labels, datasets: decDatasets } });
+
+  // CA pie chart
+  const caComp = DATA.ca_comparison;
+  const pieData = caNames.map(ca => caComp[ca]?.actual || 0);
+  createChart('chart-ca-pie', {
+    type: 'doughnut',
+    data: {
+      labels: caNames,
+      datasets: [{ data: pieData, backgroundColor: caNames.map(ca => CA_COLORS[ca]), borderWidth: 0 }]
+    },
+    options: {
+      plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 } } } }
+    }
+  });
+}
+
+function selectCA(ca) {
+  document.querySelectorAll('.ca-btn').forEach(b => {
+    b.style.opacity = b.dataset.ca === ca ? '1' : '0.4';
+  });
+
+  const panel = document.getElementById('ca-detail-content');
+  const comp = DATA.ca_comparison[ca];
+  const sales = DATA.sales_by_ca[ca];
+
+  if (!comp) { panel.innerHTML = '<p class="text-slate-400">データなし</p>'; return; }
+
+  document.getElementById('ca-detail-title').textContent = `${ca} 詳細分析`;
+
+  // Monthly breakdown
+  let monthlyHtml = '<div class="overflow-x-auto scrollbar-thin"><table class="w-full text-sm mt-3"><thead><tr class="text-slate-400 border-b border-slate-700"><th class="text-left py-1 px-2">月</th><th class="text-right py-1 px-2">目標</th><th class="text-right py-1 px-2">実績</th><th class="text-right py-1 px-2">面談数</th><th class="text-right py-1 px-2">決定数</th></tr></thead><tbody>';
+
+  if (sales && sales.monthly) {
+    const months = Object.keys(sales.monthly).filter(m => {
+      const d = sales.monthly[m];
+      return d['目標(粗利)'] > 0 || d['実績(粗利)'] > 0;
+    }).slice(-12);
+
+    months.forEach(m => {
+      const d = sales.monthly[m];
+      monthlyHtml += `<tr class="border-b border-slate-700/50">
+        <td class="py-1 px-2">${m}</td>
+        <td class="text-right py-1 px-2">${fmtMan(d['目標(粗利)'])}</td>
+        <td class="text-right py-1 px-2">${fmtMan(d['実績(粗利)'])}</td>
+        <td class="text-right py-1 px-2">${fmt(d['面談数'])}</td>
+        <td class="text-right py-1 px-2">${fmt(d['決定数'])}</td>
+      </tr>`;
+    });
+  }
+  monthlyHtml += '</tbody></table></div>';
+
+  const dec = sanitizeDecision(comp.decisions);
+  const decRate = comp.interviews > 0 ? dec / comp.interviews : 0;
+
+  panel.innerHTML = `
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <div class="glass-light rounded-lg p-3">
+        <p class="text-xs text-slate-400">目標</p>
+        <p class="text-lg font-bold">${fmtMan(comp.budget)}</p>
+      </div>
+      <div class="glass-light rounded-lg p-3">
+        <p class="text-xs text-slate-400">実績</p>
+        <p class="text-lg font-bold ${comp.achievement >= DATA.kpi.q_progress ? 'text-green-400' : 'text-yellow-400'}">${fmtMan(comp.actual)}</p>
+      </div>
+      <div class="glass-light rounded-lg p-3">
+        <p class="text-xs text-slate-400">面談数</p>
+        <p class="text-lg font-bold">${fmt(comp.interviews)} / ${fmt(comp.interview_target)}</p>
+      </div>
+      <div class="glass-light rounded-lg p-3">
+        <p class="text-xs text-slate-400">決定数 / 率</p>
+        <p class="text-lg font-bold">${fmt(dec)} / ${fmtPct(decRate)}</p>
+      </div>
+    </div>
+    ${monthlyHtml}
+  `;
+}
+
+function renderFunnel() {
+  const funnelData = DATA.funnel_data;
+  // Try both 'total' key and '合計' key
+  const totalData = funnelData['total'] || funnelData['合計'];
+  if (!funnelData || !totalData) return;
+
+  const totalFunnel = totalData.funnel || {};
+  const stages = ['アサイン', '初回面談', '求人紹介', '応募', '1st面接', '2nd面接', '最終面接', '内定', '決定'];
+
+  // Find available period keys from any stage
+  const sampleStage = totalFunnel[stages[0]] || {};
+  const allPeriodKeys = Object.keys(sampleStage).sort();
+  // Get latest quarter (FY key) or latest monthly values
+  const qKeys = allPeriodKeys.filter(k => k.includes('FY'));
+  const monthKeys = allPeriodKeys.filter(k => !k.includes('FY'));
+
+  const funnelValues = stages.map(s => {
+    const stageData = totalFunnel[s];
+    if (!stageData) return 0;
+    // Try latest quarter first, then sum latest 3 months
+    for (const q of qKeys.slice().reverse()) {
+      if (stageData[q]) return stageData[q];
+    }
+    // Fallback: sum last 3 months
+    const recent = monthKeys.slice(-3);
+    return recent.reduce((sum, m) => sum + (stageData[m] || 0), 0);
+  });
+
+  createChart('chart-funnel', {
+    type: 'bar',
+    data: {
+      labels: stages,
+      datasets: [{
+        label: '件数',
+        data: funnelValues,
+        backgroundColor: stages.map((_, i) => `rgba(59,130,246,${1 - i * 0.08})`),
+        borderColor: '#3b82f6',
+        borderWidth: 1,
+      }]
+    }
+  });
+
+  // Conversion rates over time
+  const rates = totalData.rates || {};
+  const rateKeys = ['面談決定率', '応募決定率', '内定決定率', '書類通過率'];
+  const rateMonths = [];
+
+  // Get available months (exclude FY quarter keys, only monthly dates)
+  for (const rk of rateKeys) {
+    if (rates[rk]) {
+      Object.keys(rates[rk]).forEach(m => {
+        if (m.includes('-') && !m.includes('FY') && !rateMonths.includes(m)) rateMonths.push(m);
+      });
+    }
+  }
+  rateMonths.sort();
+  // Filter to months with at least some data
+  const monthsWithData = rateMonths.filter(m => {
+    return rateKeys.some(rk => rates[rk]?.[m] > 0);
+  });
+  const recentRateMonths = monthsWithData.slice(-12);
+  const rateLabels = recentRateMonths.map(m => {
+    const parts = m.split('-');
+    return parts[0].slice(2) + '/' + parts[1];
+  });
+
+  const rateDatasets = rateKeys.map((rk, i) => ({
+    label: rk,
+    data: recentRateMonths.map(m => (rates[rk]?.[m] || 0) * 100),
+    borderColor: ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b'][i],
+    borderWidth: 2,
+    pointRadius: 2,
+  }));
+
+  createChart('chart-conversion', { type: 'line', data: { labels: rateLabels, datasets: rateDatasets } });
+
+  // Funnel table
+  const fHeader = document.getElementById('funnel-table-header');
+  fHeader.innerHTML = '<th class="text-left py-2 px-2">指標</th>' + recentRateMonths.slice(-6).map(m => `<th class="text-right py-2 px-2">${m.includes('-') ? m.split('-')[0].slice(2)+'/'+m.split('-')[1] : m}</th>`).join('');
+
+  const fBody = document.getElementById('funnel-table-body');
+  fBody.innerHTML = '';
+  rateKeys.forEach(rk => {
+    let html = `<tr class="border-b border-slate-700/50"><td class="py-1 px-2">${rk}</td>`;
+    recentRateMonths.slice(-6).forEach(m => {
+      const v = (rates[rk]?.[m] || 0) * 100;
+      html += `<td class="text-right py-1 px-2 ${v > 10 ? 'text-green-400' : v > 5 ? 'text-yellow-400' : 'text-red-400'}">${v.toFixed(1)}%</td>`;
+    });
+    html += '</tr>';
+    fBody.innerHTML += html;
+  });
+}
+
+function renderInsights() {
+  const container = document.getElementById('insights-container');
+  container.innerHTML = '';
+
+  const typeIcons = { critical: '&#9888;', warning: '&#9888;', success: '&#10003;', info: '&#8505;' };
+  const typeColors = { critical: 'text-red-400', warning: 'text-yellow-400', success: 'text-green-400', info: 'text-blue-400' };
+
+  DATA.insights.forEach(ins => {
+    container.innerHTML += `
+      <div class="glass rounded-xl p-4 insight-${ins.type}">
+        <div class="flex items-start gap-3">
+          <span class="text-lg ${typeColors[ins.type]}">${typeIcons[ins.type]}</span>
+          <div class="flex-1">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300">${ins.category}</span>
+              <h4 class="text-sm font-semibold">${ins.title}</h4>
+            </div>
+            <p class="text-sm text-slate-300 mb-2">${ins.detail}</p>
+            <p class="text-xs text-slate-400 italic">${ins.recommendation}</p>
+          </div>
+        </div>
+      </div>`;
+  });
+
+  // Generate additional AI analysis
+  generateAdvancedAnalysis();
+}
+
+function generateAdvancedAnalysis() {
+  const kpi = DATA.kpi;
+  const qProgress = kpi.q_progress;
+  const budget = kpi.q_budget.total;
+  const actual = kpi.q_actual.total;
+  const landing = kpi.landing_estimate.total;
+
+  // Prediction
+  const predContent = document.getElementById('prediction-content');
+  const remainingDays = Math.round((1 - qProgress) * 90);
+  const dailyRate = actual / (qProgress * 90);
+  const projectedTotal = actual + dailyRate * remainingDays;
+  const projectedAch = budget > 0 ? projectedTotal / budget : 0;
+
+  predContent.innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div class="glass-light rounded-lg p-3">
+        <p class="text-xs text-slate-400">現在ペース着地予測</p>
+        <p class="text-lg font-bold ${projectedAch >= 1 ? 'text-green-400' : 'text-yellow-400'}">${fmtMan(projectedTotal)}</p>
+        <p class="text-xs text-slate-500">予測達成率: ${fmtPct(projectedAch)}</p>
+      </div>
+      <div class="glass-light rounded-lg p-3">
+        <p class="text-xs text-slate-400">目標到達に必要な残り売上</p>
+        <p class="text-lg font-bold text-white">${fmtMan(Math.max(0, budget - actual))}</p>
+        <p class="text-xs text-slate-500">残り${remainingDays}日で${fmtMan(Math.max(0, budget - actual) / Math.max(1, remainingDays) * 30)}/月</p>
+      </div>
+      <div class="glass-light rounded-lg p-3">
+        <p class="text-xs text-slate-400">着地見込（シート値）</p>
+        <p class="text-lg font-bold text-white">${fmtMan(landing)}</p>
+        <p class="text-xs text-slate-500">達成率: ${fmtPct(landing / budget)}</p>
+      </div>
+    </div>
+    <div class="text-sm text-slate-300 space-y-2">
+      <p><strong class="text-purple-400">リードタイム補正:</strong> 直近2ヶ月の面談からの決定はまだ反映されていない可能性があります。過去の決定率（${fmtPct(kpi.decision_rate.total)}）から推計すると、リードタイム考慮後の着地はさらに上振れる可能性があります。</p>
+      <p><strong class="text-purple-400">リスク要因:</strong> ${actual < budget * qProgress ? '現時点で日程進捗に対して遅れがあるため、残り期間での巻き返しが必要です。' : '順調なペースですが、決定案件の遅延リスクには注意してください。'}</p>
+    </div>
+  `;
+
+  // CA Matrix
+  const matrix = document.getElementById('ca-matrix');
+  let matrixHtml = '<table class="w-full text-sm"><thead><tr class="text-slate-400 border-b border-slate-700"><th class="text-left py-2 px-2">CA</th><th class="text-center py-2 px-2">面談量</th><th class="text-center py-2 px-2">決定率</th><th class="text-center py-2 px-2">売上進捗</th><th class="text-left py-2 px-2">主要課題</th><th class="text-left py-2 px-2">推奨アクション</th></tr></thead><tbody>';
+
+  const caNames = kpi.ca_names;
+  caNames.forEach(ca => {
+    const comp = DATA.ca_comparison[ca];
+    if (!comp) return;
+    const intRate = comp.interview_target > 0 ? comp.interviews / comp.interview_target : 0;
+    const dec = sanitizeDecision(comp.decisions);
+    const decRate = comp.interviews > 0 ? dec / comp.interviews : 0;
+    const ach = comp.achievement;
+
+    // Diagnosis
+    let intStatus = intRate >= 0.9 ? '&#9679; 良好' : intRate >= 0.6 ? '&#9650; 不足' : '&#9660; 要改善';
+    let intColor = intRate >= 0.9 ? 'text-green-400' : intRate >= 0.6 ? 'text-yellow-400' : 'text-red-400';
+    let decStatus = decRate >= 0.05 ? '&#9679; 良好' : decRate >= 0.03 ? '&#9650; やや低い' : '&#9660; 要改善';
+    let decColor = decRate >= 0.05 ? 'text-green-400' : decRate >= 0.03 ? 'text-yellow-400' : 'text-red-400';
+    let achStatus = ach >= qProgress ? '&#9679; 順調' : ach >= qProgress * 0.7 ? '&#9650; 遅れ' : '&#9660; 未達';
+    let achColor = ach >= qProgress ? 'text-green-400' : ach >= qProgress * 0.7 ? 'text-yellow-400' : 'text-red-400';
+
+    let issue = '';
+    let action = '';
+    if (intRate < 0.7 && decRate < 0.03) {
+      issue = '面談数・決定率ともに低い';
+      action = '面談セット数の増加 + 求人マッチング精度の改善';
+    } else if (intRate < 0.7) {
+      issue = '面談数が不足';
+      action = 'アサイン数の増加、スカウト活動の強化';
+    } else if (decRate < 0.03) {
+      issue = '面談→決定の転換率が低い（※リードタイム影響の可能性あり）';
+      action = '面談品質向上、候補者フォロー強化、求人マッチング見直し';
+    } else if (ach < qProgress * 0.7) {
+      issue = '単価が低い、または決定タイミングの遅延';
+      action = '高単価案件への注力、決定促進アクション';
+    } else {
+      issue = '特になし（順調）';
+      action = '現状維持、さらなる成長機会の模索';
+    }
+
+    matrixHtml += `<tr class="border-b border-slate-700/50">
+      <td class="py-2 px-2 font-medium" style="color:${CA_COLORS[ca]}">${ca}</td>
+      <td class="text-center py-2 px-2 ${intColor}">${intStatus}</td>
+      <td class="text-center py-2 px-2 ${decColor}">${decStatus}</td>
+      <td class="text-center py-2 px-2 ${achColor}">${achStatus}</td>
+      <td class="py-2 px-2 text-slate-300 text-xs">${issue}</td>
+      <td class="py-2 px-2 text-slate-400 text-xs">${action}</td>
+    </tr>`;
+  });
+
+  matrixHtml += '</tbody></table>';
+  matrix.innerHTML = matrixHtml;
+}
+
+// Initialize
+loadData();
+</script>
+</body>
+</html>
