@@ -1,0 +1,43 @@
+name: Update Dashboard
+
+on:
+  schedule:
+    # 毎朝9時(JST) = 0時(UTC)に実行
+    - cron: '3 0 * * *'
+  workflow_dispatch:  # 手動実行も可能
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install openpyxl google-api-python-client google-auth requests
+
+      - name: Write service account key
+        run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}' > service_account_key.json
+
+      - name: Download sheets from Google
+        env:
+          GOOGLE_KEY_FILE: service_account_key.json
+        run: python download_sheets.py
+
+      - name: Process data
+        run: python process_data.py
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+        run: python deploy_ci.py
+
+      - name: Cleanup
+        if: always()
+        run: rm -f service_account_key.json

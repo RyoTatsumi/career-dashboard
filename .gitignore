@@ -1,0 +1,7 @@
+data/*.xlsx
+data/*.csv
+*.pyc
+__pycache__/
+service_account_key.json
+*.json.bak
+.env
