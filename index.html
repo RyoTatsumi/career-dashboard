@@ -390,9 +390,10 @@ const CA_COLORS = {
 const ALL_QUARTERS = [
   'FY24/1Q','FY24/2Q','FY24/3Q','FY24/4Q',
   'FY25/1Q','FY25/2Q','FY25/3Q','FY25/4Q',
-  'FY26/1Q'
+  'FY26/1Q','FY26/2Q','FY26/3Q','FY26/4Q'
 ];
-let SELECTED_PERIOD = 'FY26/1Q';
+function getCurrentQ(){ return DATA?.current_quarter || 'FY26/2Q'; }
+let SELECTED_PERIOD = 'FY26/2Q';
 let COMPARE_PERIOD = null;
 let COMPARE_ON = false;
 
@@ -561,6 +562,7 @@ async function loadData(){
   try{
     const r=await fetch('data/dashboard_data.json?t='+Date.now());
     DATA=await r.json();
+    SELECTED_PERIOD = DATA.current_quarter || getCurrentQ();
     document.getElementById('lastUpdate').textContent='更新: '+DATA.generated_at;
     renderPeriodBar();
     renderAll();
@@ -586,8 +588,8 @@ function renderSummary(){
   const qt=getQTrend(sp);
   const cqt=cp?getQTrend(cp):null;
 
-  // For current Q (FY26/1Q) we have detailed KPI data; for past Qs, use quarterly_trends
-  const isCurrentQ=(sp==='FY26/1Q');
+  // For current Q we have detailed KPI data; for past Qs, use quarterly_trends
+  const isCurrentQ=(sp===getCurrentQ());
   const kpi=DATA.kpi;
 
   // Build KPI values from quarterly_trends for any period
@@ -1210,13 +1212,18 @@ function renderLongTerm(){
   // --- Helper: format to 万 ---
   function fmtMan(v){ return Math.round(v/10000).toLocaleString(); }
 
-  // --- All quarters from FY23 to FY26 ---
-  const allQ = [
+  // --- All quarters from FY23 to current ---
+  const curQ = getCurrentQ();
+  const allQFull = [
     'FY23/1Q','FY23/2Q','FY23/3Q','FY23/4Q',
     'FY24/1Q','FY24/2Q','FY24/3Q','FY24/4Q',
     'FY25/1Q','FY25/2Q','FY25/3Q','FY25/4Q',
-    'FY26/1Q'
+    'FY26/1Q','FY26/2Q','FY26/3Q','FY26/4Q'
   ];
+  const allQ = allQFull.filter(q => {
+    const qd = getQData(q);
+    return qd.profit > 0 || qd.decisions > 0 || qd.interviews > 0 || q === curQ;
+  });
 
   // --- Compute quarterly data from quarterly_trends ---
   function getQData(q){
@@ -1252,12 +1259,17 @@ function renderLongTerm(){
           const growth = ((profit - prevAd.actual) / prevAd.actual * 100);
           const cls = growth >= 0 ? 'kpi-up' : 'kpi-down';
           if(fy === 'FY26'){
-            // For FY26 YTD, compare 1Q vs 1Q
-            const fy25_1q = qt['FY25／1Q']?.actual || 0;
-            const fy26_1q = qt['FY26／1Q']?.actual || 0;
-            const q1g = fy25_1q > 0 ? ((fy26_1q - fy25_1q) / fy25_1q * 100) : 0;
+            // For FY26 YTD, compare same completed quarters vs FY25
+            let fy25Same=0, fy26Same=0, compLabel='';
+            const cqNum = (DATA.current_quarter||'FY26/2Q').match(/(\d)Q/)?.[1]||'1';
+            for(let qi=1;qi<=parseInt(cqNum);qi++){
+              fy25Same += qt[`FY25／${qi}Q`]?.actual || 0;
+              fy26Same += qt[`FY26／${qi}Q`]?.actual || 0;
+            }
+            compLabel = parseInt(cqNum)>1 ? `1-${cqNum}Q` : '1Q';
+            const q1g = fy25Same > 0 ? ((fy26Same - fy25Same) / fy25Same * 100) : 0;
             const q1cls = q1g >= 0 ? 'kpi-up' : 'kpi-down';
-            yoyHtml = `<div class="kpi-sub ${q1cls}">vs FY25/1Q ${q1g>=0?'+':''}${q1g.toFixed(1)}%</div>`;
+            yoyHtml = `<div class="kpi-sub ${q1cls}">vs FY25 ${compLabel} ${q1g>=0?'+':''}${q1g.toFixed(1)}%</div>`;
           } else {
             yoyHtml = `<div class="kpi-sub ${cls}">YoY ${growth>=0?'+':''}${growth.toFixed(1)}%</div>`;
           }
@@ -1450,7 +1462,14 @@ function renderLongTerm(){
   const fy25Qs = ['FY25／1Q','FY25／2Q','FY25／3Q','FY25／4Q'];
   const tbl = document.getElementById('ltCaGrowthTable');
   if(tbl){
-    let html = '<thead><tr><th>CA</th><th class="num">FY24年間粗利</th><th class="num">FY25年間粗利</th><th class="num">FY26 1Q粗利</th><th class="num">FY25決定率</th><th class="num">FY26 1Q決定率</th><th>変化</th><th>ベストQ</th><th>ワーストQ</th></tr></thead><tbody>';
+    // Build FY26 completed quarters dynamically
+    const fy26AllQs = ['FY26／1Q','FY26／2Q','FY26／3Q','FY26／4Q'];
+    const fy26CompletedQs = fy26AllQs.filter(fwq => {
+      const d = qt[fwq];
+      return d && (d.actual > 0 || d.decisions > 0);
+    });
+    const fy26Label = fy26CompletedQs.length <= 1 ? 'FY26 1Q' : `FY26 YTD(${fy26CompletedQs.length}Q)`;
+    let html = `<thead><tr><th>CA</th><th class="num">FY24年間粗利</th><th class="num">FY25年間粗利</th><th class="num">${fy26Label}粗利</th><th class="num">FY25決定率</th><th class="num">${fy26Label}決定率</th><th>変化</th><th>ベストQ</th><th>ワーストQ</th></tr></thead><tbody>`;
     activeCas.filter(c=>!DEPARTED.includes(c)).forEach(ca => {
       // FY24 annual profit from ca_quarterly
       const fy24CaProfit = fy24Qs.reduce((s,fwq) => {
@@ -1462,9 +1481,12 @@ function renderLongTerm(){
         const d = caQuarterly[ca]?.[fwq];
         return s + (d ? (d.actual||0) : 0);
       }, 0);
-      // FY26 1Q profit
-      const fy26CaHist = caQuarterly[ca]?.['FY26／1Q'];
-      const fy26CaProfit = fy26CaHist ? (fy26CaHist.actual||0) : 0;
+      // FY26 YTD profit (all completed quarters)
+      let fy26CaProfit = 0, fy26CaTotalDec26 = 0, fy26CaTotalInt26 = 0;
+      fy26CompletedQs.forEach(fwq => {
+        const d = caQuarterly[ca]?.[fwq];
+        if(d){ fy26CaProfit += (d.actual||0); fy26CaTotalDec26 += (d.decisions||0); fy26CaTotalInt26 += (d.interviews||0); }
+      });
       // FY25 avg decision rate from ca_quarterly
       let fy25CaTotalDec = 0, fy25CaTotalInt = 0;
       fy25Qs.forEach(fwq => {
@@ -1472,10 +1494,8 @@ function renderLongTerm(){
         if(d){ fy25CaTotalDec += (d.decisions||0); fy25CaTotalInt += (d.interviews||0); }
       });
       const fy25CaRate = fy25CaTotalInt > 0 ? (fy25CaTotalDec/fy25CaTotalInt*100) : 0;
-      // FY26 1Q decision rate
-      const fy26CaInt = fy26CaHist ? (fy26CaHist.interviews||0) : 0;
-      const fy26CaDec = fy26CaHist ? (fy26CaHist.decisions||0) : 0;
-      const fy26CaRate = fy26CaInt > 0 ? (fy26CaDec/fy26CaInt*100) : 0;
+      // FY26 YTD decision rate
+      const fy26CaRate = fy26CaTotalInt26 > 0 ? (fy26CaTotalDec26/fy26CaTotalInt26*100) : 0;
       // Change
       const rateDiff = fy26CaRate - fy25CaRate;
       const trendClass = rateDiff > 0 ? 'kpi-up' : rateDiff < 0 ? 'kpi-down' : 'kpi-neutral';
@@ -1585,7 +1605,7 @@ function renderLongTerm(){
   for (const [year, prefix, qs] of [
     ['2024','FY24',['FY24/1Q','FY24/2Q','FY24/3Q','FY24/4Q']],
     ['2025','FY25',['FY25/1Q','FY25/2Q','FY25/3Q','FY25/4Q']],
-    ['2026','FY26',['FY26/1Q']],
+    ['2026','FY26',['FY26/1Q','FY26/2Q','FY26/3Q','FY26/4Q']],
   ]) {
     const total = refYears[year]?.Total;
     if (!total) continue;
@@ -1657,7 +1677,7 @@ function renderLongTerm(){
   for (const [yearKey, qs] of [
     ['ca_2024',['FY24/1Q','FY24/2Q','FY24/3Q','FY24/4Q']],
     ['ca_2025',['FY25/1Q','FY25/2Q','FY25/3Q','FY25/4Q']],
-    ['ca_2026',['FY26/1Q']],
+    ['ca_2026',['FY26/1Q','FY26/2Q','FY26/3Q','FY26/4Q']],
   ]) {
     const caData = ref[yearKey] || {};
     for (const q of qs) {
@@ -1668,7 +1688,7 @@ function renderLongTerm(){
         const dec = d?.decisions?.[q] || 0;
         if (intv > 0 || dec > 0) hasAny = true;
       }
-      if (!hasAny && yearKey === 'ca_2026' && q !== 'FY26/1Q') continue;
+      if (!hasAny) continue;
       caRefQLabels.push(q.replace('FY',''));
       for (const ca of allRefCAs) {
         const d = (ref[yearKey] || {})[ca];
@@ -1721,7 +1741,7 @@ function renderCA(){
   const pred=DATA.predictions||{};
   const selQ=SELECTED_PERIOD;
   const cmpQ=COMPARE_ON?COMPARE_PERIOD:null;
-  const isCurrentQ=(selQ==='FY26/1Q');
+  const isCurrentQ=(selQ===getCurrentQ());
   const fwQ=toFullWidthQ(selQ);
   // Comparison chart - use sales_by_ca for selected period
   const cas=DATA.kpi.ca_names;
@@ -1732,7 +1752,7 @@ function renderCA(){
     const sca=DATA.sales_by_ca?.[ca]?.quarterly?.[fwk];
     if(sca) return {budget:sca['目標(粗利)']||0,actual:sca['実績(粗利)']||0};
     // Fallback for current Q: use ca_comparison
-    if(q==='FY26/1Q'){
+    if(q===getCurrentQ()){
       const c=DATA.ca_comparison?.[ca];
       if(c) return {budget:c.budget||0,actual:c.actual||0};
     }
@@ -2383,7 +2403,8 @@ function renderReferral(){
     // Build datasets for available quarters
     const yoyDatasets=[];
     const qColors={'FY24/1Q':'#d1d5db','FY24/2Q':'#e5e7eb','FY24/3Q':'#f3f4f6','FY24/4Q':'#9ca3af',
-      'FY25/1Q':'#94a3b8','FY25/2Q':'#cbd5e1','FY25/3Q':'#a5b4fc','FY25/4Q':'#60a5fa','FY26/1Q':'#f59e0b'};
+      'FY25/1Q':'#94a3b8','FY25/2Q':'#cbd5e1','FY25/3Q':'#a5b4fc','FY25/4Q':'#60a5fa',
+      'FY26/1Q':'#f59e0b','FY26/2Q':'#f97316','FY26/3Q':'#ef4444','FY26/4Q':'#dc2626'};
     const availQs=getAvailableQuarters();
     availQs.forEach(q=>{
       const yr=q.match(/FY(\d+)/)?.[1];

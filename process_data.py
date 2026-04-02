@@ -7,6 +7,36 @@ from datetime import datetime, date
 from collections import defaultdict
 import re
 
+def get_current_quarter():
+    """Auto-detect current fiscal quarter based on today's date.
+    FY follows calendar year with Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec.
+    Returns dict with quarter info."""
+    today = datetime.now()
+    fy = today.year
+    q = (today.month - 1) // 3 + 1
+    # Previous quarter
+    prev_q = q - 1
+    prev_fy = fy
+    if prev_q <= 0:
+        prev_q = 4
+        prev_fy = fy - 1
+    # Quarter end date (last day of Q)
+    q_end_month = q * 3
+    if q_end_month == 12:
+        q_end_date = datetime(fy, 12, 31)
+    else:
+        q_end_date = datetime(fy, q_end_month + 1, 1) - __import__('datetime').timedelta(days=1)
+    return {
+        'current_q_funnel': f'FY{fy % 100}/{q}Q',       # e.g. FY26/2Q
+        'current_q_sales': f'FY{fy % 100}／{q}Q',       # full-width slash
+        'confirmed_q': f'FY{prev_fy % 100}／{prev_q}Q', # previous Q
+        'q_end_date': q_end_date,
+        'fy': fy,
+        'q': q,
+        'prev_fy': prev_fy,
+        'prev_q': prev_q,
+    }
+
 def month_sort_key(m):
     """Sort key for Japanese month strings like '2025年1月'."""
     match = re.match(r'(\d{4})年(\d{1,2})月', m)
@@ -474,9 +504,10 @@ def extract_route_breakdown(wb):
 def extract_kpi_summary(wb):
     ws = wb['KPIダッシュボード']
     ca_names = []
-    for col in range(8, 16):
+    for col in range(8, 20):  # Support up to 12 CAs
         v = safe_val(ws.cell(4, col).value)
-        if v: ca_names.append(str(v))
+        if v and str(v).strip() not in ['合計', '合計/平均', '']:
+            ca_names.append(str(v).strip())
 
     def get_row_data(row_num):
         result = {'total': parse_number(ws.cell(row_num, 7).value)}
@@ -587,13 +618,17 @@ def generate_comprehensive_insights(kpi, sales, ca_funnel, inflow, route_process
     })
 
     # ========== CA DETAIL ANALYSIS ==========
-    # Special CA statuses:
-    # 渡辺: decided to leave (決定OK) - skip negative analysis
-    # 百瀬: decided to leave (決定OK) - skip negative analysis
-    # 石丸: 1Q target = 0 (joining phase)
-    # 肥後: joins from 2Q (FY26/2Q = Apr 2026)
+    # Special CA statuses (dynamic based on current quarter):
+    # 渡辺, 百瀬: departed
+    # 石丸: 1Q target = 0 (joining phase) - only applies in 1Q
+    # 肥後: joins from 2Q - only excluded in 1Q
     departed_cas = ['渡辺', '百瀬']
-    zero_target_cas = {'石丸': '1Q'}  # CA: quarter with zero target
+    _q_info = get_current_quarter()
+    current_q_num = _q_info['q']
+    # 石丸 only has zero target in 1Q
+    zero_target_cas = {'石丸': '1Q'} if current_q_num == 1 else {}
+    # 肥後 is joining from 2Q, so only mark as joining in 1Q
+    joining_cas = ['肥後'] if current_q_num == 1 else []
 
     for ca in ca_names:
         ca_insights = []
@@ -1352,6 +1387,22 @@ def main():
     main_wb = openpyxl.load_workbook('data/main_sheet.xlsx', data_only=True)
     historical = extract_historical_data(main_wb)
 
+    # Auto-detect current quarter and set dynamic CA statuses
+    q_info = get_current_quarter()
+    current_q_num = q_info['q']
+    departed_cas = ['渡辺', '百瀬']
+    zero_target_cas = {'石丸': '1Q'} if current_q_num == 1 else {}
+    joining_cas = ['肥後'] if current_q_num == 1 else []
+    # Add 肥後 to ca_names from 2Q onward if not already present
+    if current_q_num >= 2 and '肥後' not in kpi['ca_names']:
+        kpi['ca_names'].append('肥後')
+        # Initialize KPI fields for 肥後 with 0 values
+        for key in kpi:
+            if isinstance(kpi[key], dict) and 'total' in kpi[key] and '肥後' not in kpi[key]:
+                kpi[key]['肥後'] = 0
+    print(f"  Current quarter: {q_info['current_q_funnel']} (Q{current_q_num})")
+    print(f"  Active CAs: {[c for c in kpi['ca_names'] if c not in departed_cas]}")
+
     print("Generating comprehensive insights...")
     insights = generate_comprehensive_insights(kpi, sales, ca_funnel, inflow, route_process, decision_attr)
 
@@ -1395,7 +1446,7 @@ def main():
             'decision_rate': kpi['decision_rate'].get(ca, 0),
             'landing': kpi['landing_estimate'].get(ca, 0),
             'is_departed': ca in departed_cas,
-            'is_zero_target': ca == '石丸',  # 1Q target is 0
+            'is_zero_target': ca in zero_target_cas,
         }
 
     funnel_data = {}
@@ -1839,7 +1890,6 @@ def main():
     # ===== CONFIRMED-MONTH FUNNEL CONVERSION ALERTS (確定月ベースのファネル通過率アラート) =====
     print("Building confirmed-month conversion alerts...")
     # Use confirmed months only (not current month which is still active)
-    # For FY26/1Q (Jan-Mar 2026), confirmed months are 2026-01 and 2026-02
     confirmed_months = cur_q_months[:-1]  # All months except the current (last) one
 
     conv_alert_pairs = [
@@ -1984,10 +2034,12 @@ def main():
     # DB_求職者一覧の着地日を使い、Q内着地のアクティブ案件のみカウント
     print("Building predictions...")
 
-    current_q_funnel = 'FY26/1Q'
-    current_q_sales = 'FY26／1Q'
-    confirmed_q = 'FY25／4Q'
-    q_end_date = datetime(2026, 3, 31)
+    q_info = get_current_quarter()
+    current_q_funnel = q_info['current_q_funnel']
+    current_q_sales = q_info['current_q_sales']
+    confirmed_q = q_info['confirmed_q']
+    q_end_date = q_info['q_end_date']
+    print(f"  Auto-detected quarter: {current_q_funnel} (ends {q_end_date.strftime('%Y-%m-%d')})")
 
     # --- Extract active pipeline with 着地日 from DB_求職者一覧 ---
     ws_db = wb['DB_求職者一覧']
@@ -2200,9 +2252,10 @@ def main():
         'lead_time_months': lead_time_months,
         'ca_status': {
             'departed': departed_cas,
-            'zero_target_1q': ['石丸'],
-            'joining_2q': ['肥後'],
+            'zero_target_1q': list(zero_target_cas.keys()),
+            'joining_2q': joining_cas,
         },
+        'current_quarter': current_q_funnel,
     }
 
     with open('data/dashboard_data.json', 'w', encoding='utf-8') as f:
