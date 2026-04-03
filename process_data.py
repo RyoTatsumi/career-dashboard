@@ -7,32 +7,54 @@ from datetime import datetime, date
 from collections import defaultdict
 import re
 
-def get_current_quarter():
+def get_current_quarter(sales=None):
     """Auto-detect current fiscal quarter based on today's date.
-    FY follows calendar year with Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec.
-    Returns dict with quarter info."""
+    If sales data is provided, check if the calendar quarter has actual data;
+    if not, fall back to the previous quarter (KPI sheet may not be updated yet).
+    FY follows calendar year with Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec."""
     today = datetime.now()
     fy = today.year
     q = (today.month - 1) // 3 + 1
-    # Previous quarter
-    prev_q = q - 1
-    prev_fy = fy
+
+    # Check if the calendar quarter actually has data in sales
+    # If not (e.g., 2Q just started but KPI sheet still shows 1Q), use previous Q for display
+    display_q = q
+    display_fy = fy
+    if sales and '合計' in sales:
+        cal_q_key = f'FY{fy % 100}／{q}Q'
+        cal_q_data = sales['合計'].get('quarterly', {}).get(cal_q_key, {})
+        cal_q_actual = cal_q_data.get('実績(粗利)', 0)
+        if cal_q_actual == 0 and q > 1:
+            # No actual data for current calendar Q, KPI sheet likely still showing previous Q
+            display_q = q - 1
+            display_fy = fy
+        elif cal_q_actual == 0 and q == 1:
+            display_q = 4
+            display_fy = fy - 1
+
+    # Previous quarter (for confirmed decision rate)
+    prev_q = display_q - 1
+    prev_fy = display_fy
     if prev_q <= 0:
         prev_q = 4
-        prev_fy = fy - 1
-    # Quarter end date (last day of Q)
-    q_end_month = q * 3
+        prev_fy = display_fy - 1
+
+    # Quarter end date for the display quarter
+    q_end_month = display_q * 3
     if q_end_month == 12:
-        q_end_date = datetime(fy, 12, 31)
+        q_end_date = datetime(display_fy, 12, 31)
     else:
-        q_end_date = datetime(fy, q_end_month + 1, 1) - __import__('datetime').timedelta(days=1)
+        q_end_date = datetime(display_fy, q_end_month + 1, 1) - __import__('datetime').timedelta(days=1)
+
     return {
-        'current_q_funnel': f'FY{fy % 100}/{q}Q',       # e.g. FY26/2Q
-        'current_q_sales': f'FY{fy % 100}／{q}Q',       # full-width slash
-        'confirmed_q': f'FY{prev_fy % 100}／{prev_q}Q', # previous Q
+        'current_q_funnel': f'FY{display_fy % 100}/{display_q}Q',       # e.g. FY26/1Q
+        'current_q_sales': f'FY{display_fy % 100}／{display_q}Q',       # full-width slash
+        'confirmed_q': f'FY{prev_fy % 100}／{prev_q}Q',                 # previous Q
         'q_end_date': q_end_date,
-        'fy': fy,
-        'q': q,
+        'fy': display_fy,
+        'q': display_q,
+        'calendar_q': q,          # actual calendar quarter
+        'calendar_fy': fy,
         'prev_fy': prev_fy,
         'prev_q': prev_q,
     }
@@ -623,7 +645,7 @@ def generate_comprehensive_insights(kpi, sales, ca_funnel, inflow, route_process
     # 石丸: 1Q target = 0 (joining phase) - only applies in 1Q
     # 肥後: joins from 2Q - only excluded in 1Q
     departed_cas = ['渡辺', '百瀬']
-    _q_info = get_current_quarter()
+    _q_info = get_current_quarter(sales)
     current_q_num = _q_info['q']
     # 石丸 only has zero target in 1Q
     zero_target_cas = {'石丸': '1Q'} if current_q_num == 1 else {}
@@ -1388,13 +1410,15 @@ def main():
     historical = extract_historical_data(main_wb)
 
     # Auto-detect current quarter and set dynamic CA statuses
-    q_info = get_current_quarter()
+    q_info = get_current_quarter(sales)
     current_q_num = q_info['q']
+    calendar_q_num = q_info['calendar_q']
     departed_cas = ['渡辺', '百瀬']
-    zero_target_cas = {'石丸': '1Q'} if current_q_num == 1 else {}
-    joining_cas = ['肥後'] if current_q_num == 1 else []
+    # Use calendar quarter for membership (not display quarter which may lag)
+    zero_target_cas = {'石丸': '1Q'} if calendar_q_num == 1 else {}
+    joining_cas = ['肥後'] if calendar_q_num == 1 else []
     # Add 肥後 to ca_names from 2Q onward if not already present
-    if current_q_num >= 2 and '肥後' not in kpi['ca_names']:
+    if calendar_q_num >= 2 and '肥後' not in kpi['ca_names']:
         kpi['ca_names'].append('肥後')
         # Initialize KPI fields for 肥後 with 0 values
         for key in kpi:
@@ -2034,7 +2058,7 @@ def main():
     # DB_求職者一覧の着地日を使い、Q内着地のアクティブ案件のみカウント
     print("Building predictions...")
 
-    q_info = get_current_quarter()
+    q_info = get_current_quarter(sales)
     current_q_funnel = q_info['current_q_funnel']
     current_q_sales = q_info['current_q_sales']
     confirmed_q = q_info['confirmed_q']

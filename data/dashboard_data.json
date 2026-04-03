@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-02 20:13:04",
+  "generated_at": "2026-04-03 15:14:59",
   "kpi": {
     "avg_profit": 1000000.0,
     "q_progress": 0.9777777778,
@@ -19927,29 +19927,18 @@
           "decision_rate": 0.0,
           "landing": 3750000,
           "is_departed": false,
-          "is_zero_target": false
+          "is_zero_target": true
         },
-        "issues": [
-          {
-            "area": "決定率",
-            "detail": "0.0%（※リードタイム未反映の可能性あり）",
-            "severity": "medium"
-          },
-          {
-            "area": "売上達成",
-            "detail": "達成率31.0%で大幅未達",
-            "severity": "high"
-          }
-        ],
+        "issues": [],
         "strengths": [
-          "面談数は目標の87%で充足"
+          "当Qは目標未設定（立ち上げ期間）",
+          "目標なしで74万円の実績あり"
         ],
         "monthly_trend": {},
         "actions": [
-          "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）",
-          "高単価案件への集中、決定促進アクション"
+          "立ち上げ期間のため、面談経験の蓄積とOJTに注力"
         ],
-        "status": "warning"
+        "status": "na"
       },
       "肥後": {
         "summary": {
@@ -20214,8 +20203,8 @@
     "behind": []
   },
   "weekly_pulse": {
-    "generated_at": "2026-04-02 20:13",
-    "month_progress": 0.07,
+    "generated_at": "2026-04-03 15:14",
+    "month_progress": 0.1,
     "current_month": "2026-04",
     "prev_month": "2026-03",
     "overall": {
@@ -29693,27 +29682,27 @@
     }
   },
   "predictions": {
-    "confirmed_q": "FY26／1Q",
-    "current_q": "FY26/2Q",
+    "confirmed_q": "FY25／4Q",
+    "current_q": "FY26/1Q",
     "overall": {
-      "confirmed_decision_rate": 0.03366583541147132,
-      "confirmed_q_label": "FY26／1Q",
-      "predicted_decision_rate": 10.1,
-      "historical_avg_rate": 0.06021831903796156,
-      "current_actual": 0,
-      "current_decisions": 0,
-      "additional_decisions_predicted": 10.1,
-      "total_decisions_predicted": 10.1,
-      "historical_decision_rate": 0.06021831903796156,
+      "confirmed_decision_rate": 0.07784431137724551,
+      "confirmed_q_label": "FY25／4Q",
+      "predicted_decision_rate": 0.03927680798004988,
+      "historical_avg_rate": 0.07034405967358476,
+      "current_actual": 27898924.0,
+      "current_decisions": 27.0,
+      "additional_decisions_predicted": 4.5,
+      "total_decisions_predicted": 31.5,
+      "historical_decision_rate": 0.07034405967358476,
       "avg_unit_price": 1010199.0835707503,
-      "predicted_landing": 9764210,
-      "interviews": 1.0,
+      "predicted_landing": 32092534,
+      "interviews": 802.0,
       "pipeline_detail": {
         "内定": {
-          "count": 8,
-          "out_q": 0,
+          "count": 3,
+          "out_q": 5,
           "prob": 0.7,
-          "expected": 5.6
+          "expected": 2.1
         },
         "決定": {
           "count": 1,
@@ -29722,23 +29711,23 @@
           "expected": 0.9
         },
         "最終面接": {
-          "count": 12,
-          "out_q": 0,
+          "count": 5,
+          "out_q": 7,
           "prob": 0.3,
-          "expected": 3.6
+          "expected": 1.5
         }
       }
     },
     "by_ca": {
       "辰巳": {
-        "confirmed_decision_rate": 0.043478260869565216,
-        "historical_avg_rate": 0.07741362904406382,
+        "confirmed_decision_rate": 0.1590909090909091,
+        "historical_avg_rate": 0.09630596858857729,
         "current_actual": 2200814.0,
-        "current_decisions": 0,
+        "current_decisions": 2.0,
         "additional_decisions_predicted": 0.7,
-        "total_decisions_predicted": 0.7,
-        "historical_decision_rate": 0.07741362904406382,
-        "predicted_decision_rate": 0.015217391304347825,
+        "total_decisions_predicted": 2.7,
+        "historical_decision_rate": 0.09630596858857729,
+        "predicted_decision_rate": 0.058695652173913045,
         "avg_unit_price": 1073451.4285714284,
         "predicted_landing": 2550814,
         "interviews": 46.0,
@@ -29752,24 +29741,18 @@
         }
       },
       "黒川": {
-        "confirmed_decision_rate": 0.05511811023622047,
-        "historical_avg_rate": 0.06027029649700716,
+        "confirmed_decision_rate": 0.075,
+        "historical_avg_rate": 0.07719252332391695,
         "current_actual": 7711138.0,
-        "current_decisions": 2.0,
-        "additional_decisions_predicted": 1.0,
-        "total_decisions_predicted": 3.0,
-        "historical_decision_rate": 0.06027029649700716,
-        "predicted_decision_rate": 0.023622047244094488,
+        "current_decisions": 7.0,
+        "additional_decisions_predicted": 0.3,
+        "total_decisions_predicted": 7.3,
+        "historical_decision_rate": 0.07719252332391695,
+        "predicted_decision_rate": 0.05748031496062992,
         "avg_unit_price": 1097416.1253968254,
-        "predicted_landing": 8782888,
+        "predicted_landing": 8011138,
         "interviews": 127.0,
         "pipeline_detail": {
-          "内定": {
-            "count": 1,
-            "out_q": 0,
-            "prob": 0.7,
-            "expected": 0.7
-          },
           "最終面接": {
             "count": 1,
             "out_q": 0,
@@ -29779,101 +29762,76 @@
         }
       },
       "古谷": {
-        "confirmed_decision_rate": 0.015151515151515152,
-        "historical_avg_rate": 0.043605699855699856,
+        "confirmed_decision_rate": 0.09722222222222222,
+        "historical_avg_rate": 0.05118145743145743,
         "current_actual": 2335435.0,
-        "current_decisions": 1.0,
-        "additional_decisions_predicted": 1.0,
+        "current_decisions": 2.0,
+        "additional_decisions_predicted": 0.0,
         "total_decisions_predicted": 2.0,
-        "historical_decision_rate": 0.043605699855699856,
+        "historical_decision_rate": 0.05118145743145743,
         "predicted_decision_rate": 0.015151515151515152,
         "avg_unit_price": 1043550.5476190476,
-        "predicted_landing": 2951785,
+        "predicted_landing": 2335435,
         "interviews": 132.0,
-        "pipeline_detail": {
-          "内定": {
-            "count": 1,
-            "out_q": 0,
-            "prob": 0.7,
-            "expected": 0.7
-          },
-          "最終面接": {
-            "count": 1,
-            "out_q": 0,
-            "prob": 0.3,
-            "expected": 0.3
-          }
-        }
+        "pipeline_detail": {}
       },
       "嘉重": {
-        "confirmed_decision_rate": 0.06097560975609756,
-        "historical_avg_rate": 0.08719157685762904,
+        "confirmed_decision_rate": 0.0,
+        "historical_avg_rate": 0.11142135862913097,
         "current_actual": 5743502.0,
-        "current_decisions": 2.0,
-        "additional_decisions_predicted": 3.3,
-        "total_decisions_predicted": 5.3,
-        "historical_decision_rate": 0.08719157685762904,
-        "predicted_decision_rate": 0.0646341463414634,
+        "current_decisions": 5.0,
+        "additional_decisions_predicted": 2.3,
+        "total_decisions_predicted": 7.3,
+        "historical_decision_rate": 0.11142135862913097,
+        "predicted_decision_rate": 0.08902439024390243,
         "avg_unit_price": 996865.8476190475,
-        "predicted_landing": 8952812,
+        "predicted_landing": 7678812,
         "interviews": 82.0,
         "pipeline_detail": {
           "内定": {
-            "count": 3,
-            "out_q": 0,
+            "count": 2,
+            "out_q": 1,
             "prob": 0.7,
-            "expected": 2.1
+            "expected": 1.4
           },
           "決定": {
             "count": 1,
             "out_q": 0,
             "prob": 0.9,
             "expected": 0.9
-          },
+          }
+        }
+      },
+      "百石": {
+        "confirmed_decision_rate": 0.036585365853658534,
+        "historical_avg_rate": 0.038667165494020106,
+        "current_actual": 3537200.0,
+        "current_decisions": 4.0,
+        "additional_decisions_predicted": 0.3,
+        "total_decisions_predicted": 4.3,
+        "historical_decision_rate": 0.038667165494020106,
+        "predicted_decision_rate": 0.03333333333333333,
+        "avg_unit_price": 676073.0666666667,
+        "predicted_landing": 3852200,
+        "interviews": 129.0,
+        "pipeline_detail": {
           "最終面接": {
             "count": 1,
-            "out_q": 0,
+            "out_q": 2,
             "prob": 0.3,
             "expected": 0.3
           }
         }
       },
-      "百石": {
-        "confirmed_decision_rate": 0.031007751937984496,
-        "historical_avg_rate": 0.0367523121050112,
-        "current_actual": 3537200.0,
-        "current_decisions": 5.0,
-        "additional_decisions_predicted": 1.6,
-        "total_decisions_predicted": 6.6,
-        "historical_decision_rate": 0.0367523121050112,
-        "predicted_decision_rate": 0.05116279069767442,
-        "avg_unit_price": 676073.0666666667,
-        "predicted_landing": 5155700,
-        "interviews": 129.0,
-        "pipeline_detail": {
-          "内定": {
-            "count": 1,
-            "out_q": 0,
-            "prob": 0.7,
-            "expected": 0.7
-          },
-          "最終面接": {
-            "count": 3,
-            "out_q": 0,
-            "prob": 0.3,
-            "expected": 0.9
-          }
-        }
-      },
       "石丸": {
-        "confirmed_decision_rate": 0.015384615384615385,
-        "historical_avg_rate": 0.015384615384615385,
+        "confirmed_decision_rate": 0,
+        "historical_avg_rate": 0,
         "current_actual": 744000.0,
-        "current_decisions": 0.0,
+        "current_decisions": 1.0,
         "additional_decisions_predicted": 0.0,
-        "total_decisions_predicted": 0.0,
-        "historical_decision_rate": 0.015384615384615385,
-        "predicted_decision_rate": 0.0,
+        "total_decisions_predicted": 1.0,
+        "historical_decision_rate": 0,
+        "predicted_decision_rate": 0.015384615384615385,
         "avg_unit_price": 744000.0,
         "predicted_landing": 744000,
         "interviews": 65.0,
@@ -29908,5 +29866,5 @@
     "zero_target_1q": [],
     "joining_2q": []
   },
-  "current_quarter": "FY26/2Q"
+  "current_quarter": "FY26/1Q"
 }
