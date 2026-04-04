@@ -458,7 +458,7 @@ def extract_route_breakdown(wb):
     for r in range(3, min(ws.max_row + 1, 10001)):
         route_raw = safe_val(ws.cell(r, 6).value)
         referral_raw = safe_val(ws.cell(r, 7).value)
-        scout_date = parse_dt(ws.cell(r, 15).value)
+        interview_date = parse_dt(ws.cell(r, 16).value)  # 面談日ベース（col 16）
         dec_val = ws.cell(r, 45).value  # 決定数
 
         if not route_raw and not referral_raw: continue
@@ -468,8 +468,8 @@ def extract_route_breakdown(wb):
             route_key = str(referral_raw).strip()
         route = route_map.get(route_key, 'その他')
 
-        if scout_date:
-            y, m = scout_date.year, scout_date.month
+        if interview_date:
+            y, m = interview_date.year, interview_date.month
             month_key = f'{y}年{m}月'
             q_key = to_quarter(y, m)
             route_monthly[month_key][route] += 1
