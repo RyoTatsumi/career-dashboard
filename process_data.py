@@ -9,51 +9,34 @@ import re
 
 def get_current_quarter(sales=None):
     """Auto-detect current fiscal quarter based on today's date.
-    If sales data is provided, check if the calendar quarter has actual data;
-    if not, fall back to the previous quarter (KPI sheet may not be updated yet).
+    Always uses the calendar quarter (not fallback).
     FY follows calendar year with Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec."""
     today = datetime.now()
     fy = today.year
     q = (today.month - 1) // 3 + 1
 
-    # Check if the calendar quarter actually has data in sales
-    # If not (e.g., 2Q just started but KPI sheet still shows 1Q), use previous Q for display
-    display_q = q
-    display_fy = fy
-    if sales and '合計' in sales:
-        cal_q_key = f'FY{fy % 100}／{q}Q'
-        cal_q_data = sales['合計'].get('quarterly', {}).get(cal_q_key, {})
-        cal_q_actual = cal_q_data.get('実績(粗利)', 0)
-        if cal_q_actual == 0 and q > 1:
-            # No actual data for current calendar Q, KPI sheet likely still showing previous Q
-            display_q = q - 1
-            display_fy = fy
-        elif cal_q_actual == 0 and q == 1:
-            display_q = 4
-            display_fy = fy - 1
-
     # Previous quarter (for confirmed decision rate)
-    prev_q = display_q - 1
-    prev_fy = display_fy
+    prev_q = q - 1
+    prev_fy = fy
     if prev_q <= 0:
         prev_q = 4
-        prev_fy = display_fy - 1
+        prev_fy = fy - 1
 
-    # Quarter end date for the display quarter
-    q_end_month = display_q * 3
+    # Quarter end date
+    q_end_month = q * 3
     if q_end_month == 12:
-        q_end_date = datetime(display_fy, 12, 31)
+        q_end_date = datetime(fy, 12, 31)
     else:
-        q_end_date = datetime(display_fy, q_end_month + 1, 1) - __import__('datetime').timedelta(days=1)
+        q_end_date = datetime(fy, q_end_month + 1, 1) - __import__('datetime').timedelta(days=1)
 
     return {
-        'current_q_funnel': f'FY{display_fy % 100}/{display_q}Q',       # e.g. FY26/1Q
-        'current_q_sales': f'FY{display_fy % 100}／{display_q}Q',       # full-width slash
-        'confirmed_q': f'FY{prev_fy % 100}／{prev_q}Q',                 # previous Q
+        'current_q_funnel': f'FY{fy % 100}/{q}Q',       # e.g. FY26/2Q
+        'current_q_sales': f'FY{fy % 100}／{q}Q',       # full-width slash
+        'confirmed_q': f'FY{prev_fy % 100}／{prev_q}Q', # previous Q (for confirmed rates)
         'q_end_date': q_end_date,
-        'fy': display_fy,
-        'q': display_q,
-        'calendar_q': q,          # actual calendar quarter
+        'fy': fy,
+        'q': q,
+        'calendar_q': q,
         'calendar_fy': fy,
         'prev_fy': prev_fy,
         'prev_q': prev_q,
@@ -1424,6 +1407,38 @@ def main():
         for key in kpi:
             if isinstance(kpi[key], dict) and 'total' in kpi[key] and '肥後' not in kpi[key]:
                 kpi[key]['肥後'] = 0
+    # Override KPI totals with sales management data for current Q
+    # (KPI sheet may still show previous Q data at start of new Q)
+    current_q_sales_key = q_info['current_q_sales']
+    total_sales_q = sales.get('合計', {}).get('quarterly', {}).get(current_q_sales_key, {})
+    if total_sales_q and total_sales_q.get('目標(粗利)', 0) > 0:
+        total_budget = total_sales_q.get('目標(粗利)', 0)
+        total_actual = total_sales_q.get('実績(粗利)', 0)
+        total_ach = total_actual / total_budget if total_budget > 0 else 0
+        # Calculate Q progress based on date
+        q_start_month = (current_q_num - 1) * 3 + 1
+        q_start = datetime(q_info['fy'], q_start_month, 1)
+        q_total_days = (q_info['q_end_date'] - q_start).days + 1
+        q_elapsed = (datetime.now() - q_start).days
+        q_progress = max(0, min(1, q_elapsed / q_total_days))
+        kpi['q_budget'] = {**kpi.get('q_budget', {}), 'total': total_budget}
+        kpi['q_actual'] = {**kpi.get('q_actual', {}), 'total': total_actual}
+        kpi['achievement_rate'] = {**kpi.get('achievement_rate', {}), 'total': total_ach}
+        kpi['q_progress'] = q_progress
+        # Override per-CA from sales
+        for ca in kpi['ca_names']:
+            ca_sq = sales.get(ca, {}).get('quarterly', {}).get(current_q_sales_key, {})
+            if ca_sq:
+                kpi['q_budget'][ca] = ca_sq.get('目標(粗利)', 0)
+                kpi['q_actual'][ca] = ca_sq.get('実績(粗利)', 0)
+                b = kpi['q_budget'][ca]
+                a = kpi['q_actual'][ca]
+                kpi['achievement_rate'][ca] = a / b if b > 0 else 0
+                kpi.setdefault('landing_estimate', {})[ca] = ca_sq.get('着地見込み', 0)
+                kpi.setdefault('decision_count', {})[ca] = ca_sq.get('決定数', 0)
+                kpi.setdefault('interview_actual', {})[ca] = ca_sq.get('面談数', 0)
+        print(f"  KPI overridden with sales data for {current_q_sales_key}: target={total_budget/10000:.0f}万 actual={total_actual/10000:.0f}万")
+
     print(f"  Current quarter: {q_info['current_q_funnel']} (Q{current_q_num})")
     print(f"  Active CAs: {[c for c in kpi['ca_names'] if c not in departed_cas]}")
 
@@ -1458,17 +1473,39 @@ def main():
 
     ca_comparison = {}
     departed_cas = ['渡辺', '百瀬']
+    current_q_key = q_info['current_q_sales']  # e.g. 'FY26／2Q'
     for ca in kpi['ca_names']:
-        dec_val = kpi['decision_count'].get(ca, 0)
-        if dec_val > 1000: dec_val = 0  # fix formula errors
+        # Prefer sales_by_ca data for current Q (more accurate than KPI sheet which may lag)
+        ca_sales_q = sales.get(ca, {}).get('quarterly', {}).get(current_q_key, {})
+        if ca_sales_q and ca_sales_q.get('目標(粗利)', 0) > 0:
+            # Use sales management data
+            budget = ca_sales_q.get('目標(粗利)', 0)
+            actual = ca_sales_q.get('実績(粗利)', 0)
+            ach = actual / budget if budget > 0 else 0
+            dec_val = ca_sales_q.get('決定数', 0)
+            interviews = ca_sales_q.get('面談数', 0)
+            int_target = kpi['interview_target'].get(ca, 0)
+            dec_rate = dec_val / interviews if interviews > 0 else 0
+            landing = ca_sales_q.get('着地見込み', 0)
+        else:
+            # Fallback to KPI sheet
+            budget = kpi['q_budget'].get(ca, 0)
+            actual = kpi['q_actual'].get(ca, 0)
+            ach = kpi['achievement_rate'].get(ca, 0)
+            dec_val = kpi['decision_count'].get(ca, 0)
+            if dec_val > 1000: dec_val = 0
+            interviews = kpi['interview_actual'].get(ca, 0)
+            int_target = kpi['interview_target'].get(ca, 0)
+            dec_rate = kpi['decision_rate'].get(ca, 0)
+            landing = kpi['landing_estimate'].get(ca, 0)
         ca_comparison[ca] = {
-            'budget': kpi['q_budget'].get(ca, 0), 'actual': kpi['q_actual'].get(ca, 0),
-            'achievement': kpi['achievement_rate'].get(ca, 0),
-            'interviews': kpi['interview_actual'].get(ca, 0),
-            'interview_target': kpi['interview_target'].get(ca, 0),
+            'budget': budget, 'actual': actual,
+            'achievement': ach,
+            'interviews': interviews,
+            'interview_target': int_target,
             'decisions': dec_val,
-            'decision_rate': kpi['decision_rate'].get(ca, 0),
-            'landing': kpi['landing_estimate'].get(ca, 0),
+            'decision_rate': dec_rate,
+            'landing': landing,
             'is_departed': ca in departed_cas,
             'is_zero_target': ca in zero_target_cas,
         }

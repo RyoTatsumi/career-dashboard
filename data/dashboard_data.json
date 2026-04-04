@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-04-03 15:14:59",
+  "generated_at": "2026-04-04 11:36:04",
   "kpi": {
     "avg_profit": 1000000.0,
-    "q_progress": 0.9777777778,
+    "q_progress": 0.03296703296703297,
     "ca_names": [
       "辰巳",
       "黒川",
@@ -15,40 +15,40 @@
       "肥後"
     ],
     "q_budget": {
-      "total": 39400000,
-      "辰巳": 3000000.0,
+      "total": 44800000.0,
+      "辰巳": 3500000.0,
       "黒川": 8000000.0,
-      "渡辺": 6000000.0,
-      "古谷": 6000000.0,
-      "嘉重": 6000000.0,
-      "百石": 5000000.0,
-      "百瀬": 3000000.0,
-      "石丸": 2400000.0,
-      "肥後": 0
+      "渡辺": 0.0,
+      "古谷": 7000000.0,
+      "嘉重": 8000000.0,
+      "百石": 7000000.0,
+      "百瀬": 0.0,
+      "石丸": 3500000.0,
+      "肥後": 800000.0
     },
     "q_actual": {
-      "total": 27898924.0,
-      "辰巳": 2200814.0,
-      "黒川": 7711138.0,
-      "渡辺": 1783600.0,
-      "古谷": 2335435.0,
-      "嘉重": 5743502.0,
-      "百石": 3537200.0,
+      "total": 0.0,
+      "辰巳": 0.0,
+      "黒川": 0.0,
+      "渡辺": 0.0,
+      "古谷": 0.0,
+      "嘉重": 0.0,
+      "百石": 0.0,
       "百瀬": 0.0,
-      "石丸": 744000.0,
-      "肥後": 0
+      "石丸": 0.0,
+      "肥後": 0.0
     },
     "achievement_rate": {
-      "total": 0.7080945178,
-      "辰巳": 0.7336046667,
-      "黒川": 0.96389225,
-      "渡辺": 0.2972666667,
-      "古谷": 0.3892391667,
-      "嘉重": 0.9572503333,
-      "百石": 0.70744,
+      "total": 0.0,
+      "辰巳": 0.0,
+      "黒川": 0.0,
+      "渡辺": 0,
+      "古谷": 0.0,
+      "嘉重": 0.0,
+      "百石": 0.0,
       "百瀬": 0,
-      "石丸": 0.31,
-      "肥後": 0
+      "石丸": 0.0,
+      "肥後": 0.0
     },
     "expected_consumption": {
       "total": 38524444.44,
@@ -76,15 +76,15 @@
     },
     "landing_estimate": {
       "total": 30000000,
-      "辰巳": 3750000,
-      "黒川": 3750000,
-      "渡辺": 3750000,
-      "古谷": 3750000,
-      "嘉重": 3750000,
-      "百石": 3750000,
-      "百瀬": 3750000,
-      "石丸": 3750000,
-      "肥後": 0
+      "辰巳": 0.0,
+      "黒川": 551250.0,
+      "渡辺": 0.0,
+      "古谷": 2567250.0,
+      "嘉重": 1776250.0,
+      "百石": 1372500.0,
+      "百瀬": 0.0,
+      "石丸": 0.0,
+      "肥後": 0.0
     },
     "target_interviews": {
       "total": 600,
@@ -136,15 +136,15 @@
     },
     "interview_actual": {
       "total": 802.0,
-      "辰巳": 46.0,
-      "黒川": 127.0,
-      "渡辺": 29.0,
-      "古谷": 132.0,
-      "嘉重": 82.0,
-      "百石": 129.0,
-      "百瀬": 71.0,
-      "石丸": 65.0,
-      "肥後": 0
+      "辰巳": 0.0,
+      "黒川": 0.0,
+      "渡辺": 0.0,
+      "古谷": 0.0,
+      "嘉重": 0.0,
+      "百石": 0.0,
+      "百瀬": 0.0,
+      "石丸": 0.0,
+      "肥後": 0.0
     },
     "interview_achievement": {
       "total": 1.336666667,
@@ -160,15 +160,15 @@
     },
     "decision_count": {
       "total": 27.0,
-      "辰巳": 38745259.0,
-      "黒川": 2.0,
-      "渡辺": 7.0,
-      "古谷": 1.0,
-      "嘉重": 2.0,
-      "百石": 5.0,
-      "百瀬": 4.0,
+      "辰巳": 0.0,
+      "黒川": 0.0,
+      "渡辺": 0.0,
+      "古谷": 0.0,
+      "嘉重": 0.0,
+      "百石": 0.0,
+      "百瀬": 0.0,
       "石丸": 0.0,
-      "肥後": 0
+      "肥後": 0.0
     },
     "decision_rate": {
       "total": 0.03366583541,
@@ -521,110 +521,110 @@
   },
   "ca_comparison": {
     "辰巳": {
-      "budget": 3000000.0,
-      "actual": 2200814.0,
-      "achievement": 0.7336046667,
-      "interviews": 46.0,
+      "budget": 3500000.0,
+      "actual": 0.0,
+      "achievement": 0.0,
+      "interviews": 0.0,
       "interview_target": 75.0,
-      "decisions": 0,
-      "decision_rate": 842288.2391,
-      "landing": 3750000,
+      "decisions": 0.0,
+      "decision_rate": 0,
+      "landing": 0.0,
       "is_departed": false,
       "is_zero_target": false
     },
     "黒川": {
       "budget": 8000000.0,
-      "actual": 7711138.0,
-      "achievement": 0.96389225,
-      "interviews": 127.0,
+      "actual": 0.0,
+      "achievement": 0.0,
+      "interviews": 0.0,
       "interview_target": 75.0,
-      "decisions": 2.0,
-      "decision_rate": 0.0157480315,
-      "landing": 3750000,
+      "decisions": 0.0,
+      "decision_rate": 0,
+      "landing": 551250.0,
       "is_departed": false,
       "is_zero_target": false
     },
     "渡辺": {
-      "budget": 6000000.0,
-      "actual": 1783600.0,
-      "achievement": 0.2972666667,
-      "interviews": 29.0,
+      "budget": 0.0,
+      "actual": 0.0,
+      "achievement": 0,
+      "interviews": 0.0,
       "interview_target": 75.0,
-      "decisions": 7.0,
+      "decisions": 0.0,
       "decision_rate": 0.2413793103,
-      "landing": 3750000,
+      "landing": 0.0,
       "is_departed": true,
       "is_zero_target": false
     },
     "古谷": {
-      "budget": 6000000.0,
-      "actual": 2335435.0,
-      "achievement": 0.3892391667,
-      "interviews": 132.0,
+      "budget": 7000000.0,
+      "actual": 0.0,
+      "achievement": 0.0,
+      "interviews": 0.0,
       "interview_target": 75.0,
-      "decisions": 1.0,
-      "decision_rate": 0.007575757576,
-      "landing": 3750000,
+      "decisions": 0.0,
+      "decision_rate": 0,
+      "landing": 2567250.0,
       "is_departed": false,
       "is_zero_target": false
     },
     "嘉重": {
-      "budget": 6000000.0,
-      "actual": 5743502.0,
-      "achievement": 0.9572503333,
-      "interviews": 82.0,
+      "budget": 8000000.0,
+      "actual": 0.0,
+      "achievement": 0.0,
+      "interviews": 0.0,
       "interview_target": 75.0,
-      "decisions": 2.0,
-      "decision_rate": 0.0243902439,
-      "landing": 3750000,
+      "decisions": 0.0,
+      "decision_rate": 0,
+      "landing": 1776250.0,
       "is_departed": false,
       "is_zero_target": false
     },
     "百石": {
-      "budget": 5000000.0,
-      "actual": 3537200.0,
-      "achievement": 0.70744,
-      "interviews": 129.0,
+      "budget": 7000000.0,
+      "actual": 0.0,
+      "achievement": 0.0,
+      "interviews": 0.0,
       "interview_target": 75.0,
-      "decisions": 5.0,
-      "decision_rate": 0.03875968992,
-      "landing": 3750000,
+      "decisions": 0.0,
+      "decision_rate": 0,
+      "landing": 1372500.0,
       "is_departed": false,
       "is_zero_target": false
     },
     "百瀬": {
-      "budget": 3000000.0,
+      "budget": 0.0,
       "actual": 0.0,
       "achievement": 0,
-      "interviews": 71.0,
+      "interviews": 0.0,
       "interview_target": 75.0,
-      "decisions": 4.0,
+      "decisions": 0.0,
       "decision_rate": 0.05633802817,
-      "landing": 3750000,
+      "landing": 0.0,
       "is_departed": true,
       "is_zero_target": false
     },
     "石丸": {
-      "budget": 2400000.0,
-      "actual": 744000.0,
-      "achievement": 0.31,
-      "interviews": 65.0,
+      "budget": 3500000.0,
+      "actual": 0.0,
+      "achievement": 0.0,
+      "interviews": 0.0,
       "interview_target": 75.0,
       "decisions": 0.0,
       "decision_rate": 0,
-      "landing": 3750000,
+      "landing": 0.0,
       "is_departed": false,
       "is_zero_target": false
     },
     "肥後": {
-      "budget": 0,
-      "actual": 0,
-      "achievement": 0,
-      "interviews": 0,
+      "budget": 800000.0,
+      "actual": 0.0,
+      "achievement": 0.0,
+      "interviews": 0.0,
       "interview_target": 0,
-      "decisions": 0,
+      "decisions": 0.0,
       "decision_rate": 0,
-      "landing": 0,
+      "landing": 0.0,
       "is_departed": false,
       "is_zero_target": false
     }
@@ -19627,11 +19627,11 @@
       {
         "type": "critical",
         "title": "売上進捗が日程進捗を大幅に下回っています",
-        "detail": "日程進捗97.8%に対し売上達成率70.8%（差分27.0pp）。現ペースでは目標未達の可能性が高い。",
+        "detail": "日程進捗3.3%に対し売上達成率0.0%（差分3.3pp）。現ペースでは目標未達の可能性が高い。",
         "metrics": {
-          "日程進捗": "97.8%",
-          "売上達成率": "70.8%",
-          "差分": "27.0pp"
+          "日程進捗": "3.3%",
+          "売上達成率": "0.0%",
+          "差分": "3.3pp"
         },
         "action": "ヨミ案件の精査、決定見込み案件の早期クロージング、高単価案件への集中を検討"
       },
@@ -19668,23 +19668,23 @@
     "ca_detail": {
       "辰巳": {
         "summary": {
-          "budget": 3000000.0,
-          "actual": 2200814.0,
-          "achievement": 0.7336046667,
-          "interviews": 46.0,
+          "budget": 3500000.0,
+          "actual": 0.0,
+          "achievement": 0.0,
+          "interviews": 0.0,
           "interview_target": 75.0,
-          "interview_rate": 0.6133333333333333,
-          "decisions": 0,
-          "decision_rate": 0.0,
-          "landing": 3750000,
+          "interview_rate": 0.0,
+          "decisions": 0.0,
+          "decision_rate": 0,
+          "landing": 0.0,
           "is_departed": false,
           "is_zero_target": false
         },
         "issues": [
           {
             "area": "面談数",
-            "detail": "目標75件に対し46件（61%）でやや不足",
-            "severity": "medium"
+            "detail": "目標75件に対し0件（0%）で大幅不足",
+            "severity": "high"
           },
           {
             "area": "決定率",
@@ -19693,8 +19693,8 @@
           },
           {
             "area": "売上達成",
-            "detail": "達成率73.4%で遅れ",
-            "severity": "medium"
+            "detail": "達成率0.0%で大幅未達",
+            "severity": "high"
           }
         ],
         "strengths": [],
@@ -19705,35 +19705,44 @@
           "change": -0.5565339097872231
         },
         "actions": [
-          "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）"
+          "スカウト活動の強化・アサイン数の増加が急務",
+          "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）",
+          "高単価案件への集中、決定促進アクション"
         ],
-        "status": "good"
+        "status": "critical"
       },
       "黒川": {
         "summary": {
           "budget": 8000000.0,
-          "actual": 7711138.0,
-          "achievement": 0.96389225,
-          "interviews": 127.0,
+          "actual": 0.0,
+          "achievement": 0.0,
+          "interviews": 0.0,
           "interview_target": 75.0,
-          "interview_rate": 1.6933333333333334,
-          "decisions": 2.0,
-          "decision_rate": 0.015748031496062992,
-          "landing": 3750000,
+          "interview_rate": 0.0,
+          "decisions": 0.0,
+          "decision_rate": 0,
+          "landing": 551250.0,
           "is_departed": false,
           "is_zero_target": false
         },
         "issues": [
           {
+            "area": "面談数",
+            "detail": "目標75件に対し0件（0%）で大幅不足",
+            "severity": "high"
+          },
+          {
             "area": "決定率",
-            "detail": "1.6%（※リードタイム未反映の可能性あり）",
+            "detail": "0.0%（※リードタイム未反映の可能性あり）",
             "severity": "medium"
+          },
+          {
+            "area": "売上達成",
+            "detail": "達成率0.0%で大幅未達",
+            "severity": "high"
           }
         ],
-        "strengths": [
-          "面談数は目標の169%で充足",
-          "売上達成率96.4%で順調"
-        ],
+        "strengths": [],
         "monthly_trend": {
           "last_month": "2026年3月",
           "value": 4872337.0,
@@ -19741,21 +19750,23 @@
           "change": 0.7163362278652149
         },
         "actions": [
-          "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）"
+          "スカウト活動の強化・アサイン数の増加が急務",
+          "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）",
+          "高単価案件への集中、決定促進アクション"
         ],
-        "status": "good"
+        "status": "critical"
       },
       "渡辺": {
         "summary": {
-          "budget": 6000000.0,
-          "actual": 1783600.0,
-          "achievement": 0.2972666667,
-          "interviews": 29.0,
+          "budget": 0.0,
+          "actual": 0.0,
+          "achievement": 0,
+          "interviews": 0.0,
           "interview_target": 75.0,
-          "interview_rate": 0.38666666666666666,
-          "decisions": 7.0,
-          "decision_rate": 0.2413793103448276,
-          "landing": 3750000,
+          "interview_rate": 0.0,
+          "decisions": 0.0,
+          "decision_rate": 0,
+          "landing": 0.0,
           "is_departed": true,
           "is_zero_target": false
         },
@@ -19776,33 +19787,36 @@
       },
       "古谷": {
         "summary": {
-          "budget": 6000000.0,
-          "actual": 2335435.0,
-          "achievement": 0.3892391667,
-          "interviews": 132.0,
+          "budget": 7000000.0,
+          "actual": 0.0,
+          "achievement": 0.0,
+          "interviews": 0.0,
           "interview_target": 75.0,
-          "interview_rate": 1.76,
-          "decisions": 1.0,
-          "decision_rate": 0.007575757575757576,
-          "landing": 3750000,
+          "interview_rate": 0.0,
+          "decisions": 0.0,
+          "decision_rate": 0,
+          "landing": 2567250.0,
           "is_departed": false,
           "is_zero_target": false
         },
         "issues": [
           {
+            "area": "面談数",
+            "detail": "目標75件に対し0件（0%）で大幅不足",
+            "severity": "high"
+          },
+          {
             "area": "決定率",
-            "detail": "0.8%（※リードタイム未反映の可能性あり）",
+            "detail": "0.0%（※リードタイム未反映の可能性あり）",
             "severity": "medium"
           },
           {
             "area": "売上達成",
-            "detail": "達成率38.9%で大幅未達",
+            "detail": "達成率0.0%で大幅未達",
             "severity": "high"
           }
         ],
-        "strengths": [
-          "面談数は目標の176%で充足"
-        ],
+        "strengths": [],
         "monthly_trend": {
           "last_month": "2026年3月",
           "value": 961422.0,
@@ -19810,36 +19824,44 @@
           "change": -0.3002817295032871
         },
         "actions": [
+          "スカウト活動の強化・アサイン数の増加が急務",
           "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）",
           "高単価案件への集中、決定促進アクション"
         ],
-        "status": "warning"
+        "status": "critical"
       },
       "嘉重": {
         "summary": {
-          "budget": 6000000.0,
-          "actual": 5743502.0,
-          "achievement": 0.9572503333,
-          "interviews": 82.0,
+          "budget": 8000000.0,
+          "actual": 0.0,
+          "achievement": 0.0,
+          "interviews": 0.0,
           "interview_target": 75.0,
-          "interview_rate": 1.0933333333333333,
-          "decisions": 2.0,
-          "decision_rate": 0.024390243902439025,
-          "landing": 3750000,
+          "interview_rate": 0.0,
+          "decisions": 0.0,
+          "decision_rate": 0,
+          "landing": 1776250.0,
           "is_departed": false,
           "is_zero_target": false
         },
         "issues": [
           {
+            "area": "面談数",
+            "detail": "目標75件に対し0件（0%）で大幅不足",
+            "severity": "high"
+          },
+          {
             "area": "決定率",
-            "detail": "2.4%でやや低い",
+            "detail": "0.0%（※リードタイム未反映の可能性あり）",
             "severity": "medium"
+          },
+          {
+            "area": "売上達成",
+            "detail": "達成率0.0%で大幅未達",
+            "severity": "high"
           }
         ],
-        "strengths": [
-          "面談数は目標の109%で充足",
-          "売上達成率95.7%で順調"
-        ],
+        "strengths": [],
         "monthly_trend": {
           "last_month": "2026年3月",
           "value": 1200600.0,
@@ -19847,39 +19869,44 @@
           "change": -0.6593369924955396
         },
         "actions": [
-          "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）"
+          "スカウト活動の強化・アサイン数の増加が急務",
+          "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）",
+          "高単価案件への集中、決定促進アクション"
         ],
-        "status": "good"
+        "status": "critical"
       },
       "百石": {
         "summary": {
-          "budget": 5000000.0,
-          "actual": 3537200.0,
-          "achievement": 0.70744,
-          "interviews": 129.0,
+          "budget": 7000000.0,
+          "actual": 0.0,
+          "achievement": 0.0,
+          "interviews": 0.0,
           "interview_target": 75.0,
-          "interview_rate": 1.72,
-          "decisions": 5.0,
-          "decision_rate": 0.03875968992248062,
-          "landing": 3750000,
+          "interview_rate": 0.0,
+          "decisions": 0.0,
+          "decision_rate": 0,
+          "landing": 1372500.0,
           "is_departed": false,
           "is_zero_target": false
         },
         "issues": [
           {
+            "area": "面談数",
+            "detail": "目標75件に対し0件（0%）で大幅不足",
+            "severity": "high"
+          },
+          {
             "area": "決定率",
-            "detail": "3.9%でやや低い",
+            "detail": "0.0%（※リードタイム未反映の可能性あり）",
             "severity": "medium"
           },
           {
             "area": "売上達成",
-            "detail": "達成率70.7%で遅れ",
-            "severity": "medium"
+            "detail": "達成率0.0%で大幅未達",
+            "severity": "high"
           }
         ],
-        "strengths": [
-          "面談数は目標の172%で充足"
-        ],
+        "strengths": [],
         "monthly_trend": {
           "last_month": "2026年3月",
           "value": 1957200.0,
@@ -19887,21 +19914,23 @@
           "change": 0.23873417721518989
         },
         "actions": [
-          "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）"
+          "スカウト活動の強化・アサイン数の増加が急務",
+          "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）",
+          "高単価案件への集中、決定促進アクション"
         ],
-        "status": "good"
+        "status": "critical"
       },
       "百瀬": {
         "summary": {
-          "budget": 3000000.0,
+          "budget": 0.0,
           "actual": 0.0,
           "achievement": 0,
-          "interviews": 71.0,
+          "interviews": 0.0,
           "interview_target": 75.0,
-          "interview_rate": 0.9466666666666667,
-          "decisions": 4.0,
-          "decision_rate": 0.056338028169014086,
-          "landing": 3750000,
+          "interview_rate": 0.0,
+          "decisions": 0.0,
+          "decision_rate": 0,
+          "landing": 0.0,
           "is_departed": true,
           "is_zero_target": false
         },
@@ -19917,40 +19946,55 @@
       },
       "石丸": {
         "summary": {
-          "budget": 2400000.0,
-          "actual": 744000.0,
-          "achievement": 0.31,
-          "interviews": 65.0,
+          "budget": 3500000.0,
+          "actual": 0.0,
+          "achievement": 0.0,
+          "interviews": 0.0,
           "interview_target": 75.0,
-          "interview_rate": 0.8666666666666667,
+          "interview_rate": 0.0,
           "decisions": 0.0,
-          "decision_rate": 0.0,
-          "landing": 3750000,
+          "decision_rate": 0,
+          "landing": 0.0,
           "is_departed": false,
-          "is_zero_target": true
+          "is_zero_target": false
         },
-        "issues": [],
-        "strengths": [
-          "当Qは目標未設定（立ち上げ期間）",
-          "目標なしで74万円の実績あり"
+        "issues": [
+          {
+            "area": "面談数",
+            "detail": "目標75件に対し0件（0%）で大幅不足",
+            "severity": "high"
+          },
+          {
+            "area": "決定率",
+            "detail": "0.0%（※リードタイム未反映の可能性あり）",
+            "severity": "medium"
+          },
+          {
+            "area": "売上達成",
+            "detail": "達成率0.0%で大幅未達",
+            "severity": "high"
+          }
         ],
+        "strengths": [],
         "monthly_trend": {},
         "actions": [
-          "立ち上げ期間のため、面談経験の蓄積とOJTに注力"
+          "スカウト活動の強化・アサイン数の増加が急務",
+          "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）",
+          "高単価案件への集中、決定促進アクション"
         ],
-        "status": "na"
+        "status": "critical"
       },
       "肥後": {
         "summary": {
-          "budget": 0,
-          "actual": 0,
-          "achievement": 0,
-          "interviews": 0,
+          "budget": 800000.0,
+          "actual": 0.0,
+          "achievement": 0.0,
+          "interviews": 0.0,
           "interview_target": 0,
           "interview_rate": 0,
-          "decisions": 0,
+          "decisions": 0.0,
           "decision_rate": 0,
-          "landing": 0,
+          "landing": 0.0,
           "is_departed": false,
           "is_zero_target": false
         },
@@ -19959,14 +20003,20 @@
             "area": "決定率",
             "detail": "0.0%（※リードタイム未反映の可能性あり）",
             "severity": "medium"
+          },
+          {
+            "area": "売上達成",
+            "detail": "達成率0.0%で大幅未達",
+            "severity": "high"
           }
         ],
         "strengths": [],
         "monthly_trend": {},
         "actions": [
-          "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）"
+          "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）",
+          "高単価案件への集中、決定促進アクション"
         ],
-        "status": "good"
+        "status": "warning"
       }
     },
     "inflow": [
@@ -20203,8 +20253,8 @@
     "behind": []
   },
   "weekly_pulse": {
-    "generated_at": "2026-04-03 15:14",
-    "month_progress": 0.1,
+    "generated_at": "2026-04-04 11:36",
+    "month_progress": 0.13,
     "current_month": "2026-04",
     "prev_month": "2026-03",
     "overall": {
@@ -29682,27 +29732,27 @@
     }
   },
   "predictions": {
-    "confirmed_q": "FY25／4Q",
-    "current_q": "FY26/1Q",
+    "confirmed_q": "FY26／1Q",
+    "current_q": "FY26/2Q",
     "overall": {
-      "confirmed_decision_rate": 0.07784431137724551,
-      "confirmed_q_label": "FY25／4Q",
-      "predicted_decision_rate": 0.03927680798004988,
-      "historical_avg_rate": 0.07034405967358476,
-      "current_actual": 27898924.0,
-      "current_decisions": 27.0,
-      "additional_decisions_predicted": 4.5,
-      "total_decisions_predicted": 31.5,
-      "historical_decision_rate": 0.07034405967358476,
+      "confirmed_decision_rate": 0.03366583541147132,
+      "confirmed_q_label": "FY26／1Q",
+      "predicted_decision_rate": 10.1,
+      "historical_avg_rate": 0.06021831903796156,
+      "current_actual": 0,
+      "current_decisions": 0,
+      "additional_decisions_predicted": 10.1,
+      "total_decisions_predicted": 10.1,
+      "historical_decision_rate": 0.06021831903796156,
       "avg_unit_price": 1010199.0835707503,
-      "predicted_landing": 32092534,
-      "interviews": 802.0,
+      "predicted_landing": 9764210,
+      "interviews": 1.0,
       "pipeline_detail": {
         "内定": {
-          "count": 3,
-          "out_q": 5,
+          "count": 8,
+          "out_q": 0,
           "prob": 0.7,
-          "expected": 2.1
+          "expected": 5.6
         },
         "決定": {
           "count": 1,
@@ -29711,26 +29761,26 @@
           "expected": 0.9
         },
         "最終面接": {
-          "count": 5,
-          "out_q": 7,
+          "count": 12,
+          "out_q": 0,
           "prob": 0.3,
-          "expected": 1.5
+          "expected": 3.6
         }
       }
     },
     "by_ca": {
       "辰巳": {
-        "confirmed_decision_rate": 0.1590909090909091,
-        "historical_avg_rate": 0.09630596858857729,
-        "current_actual": 2200814.0,
-        "current_decisions": 2.0,
+        "confirmed_decision_rate": 0.043478260869565216,
+        "historical_avg_rate": 0.07741362904406382,
+        "current_actual": 0.0,
+        "current_decisions": 0.0,
         "additional_decisions_predicted": 0.7,
-        "total_decisions_predicted": 2.7,
-        "historical_decision_rate": 0.09630596858857729,
-        "predicted_decision_rate": 0.058695652173913045,
+        "total_decisions_predicted": 0.7,
+        "historical_decision_rate": 0.07741362904406382,
+        "predicted_decision_rate": 0,
         "avg_unit_price": 1073451.4285714284,
-        "predicted_landing": 2550814,
-        "interviews": 46.0,
+        "predicted_landing": 350000,
+        "interviews": 0.0,
         "pipeline_detail": {
           "内定": {
             "count": 1,
@@ -29741,18 +29791,24 @@
         }
       },
       "黒川": {
-        "confirmed_decision_rate": 0.075,
-        "historical_avg_rate": 0.07719252332391695,
-        "current_actual": 7711138.0,
-        "current_decisions": 7.0,
-        "additional_decisions_predicted": 0.3,
-        "total_decisions_predicted": 7.3,
-        "historical_decision_rate": 0.07719252332391695,
-        "predicted_decision_rate": 0.05748031496062992,
+        "confirmed_decision_rate": 0.05511811023622047,
+        "historical_avg_rate": 0.06027029649700716,
+        "current_actual": 0.0,
+        "current_decisions": 0.0,
+        "additional_decisions_predicted": 1.0,
+        "total_decisions_predicted": 1.0,
+        "historical_decision_rate": 0.06027029649700716,
+        "predicted_decision_rate": 0,
         "avg_unit_price": 1097416.1253968254,
-        "predicted_landing": 8011138,
-        "interviews": 127.0,
+        "predicted_landing": 1071750,
+        "interviews": 0.0,
         "pipeline_detail": {
+          "内定": {
+            "count": 1,
+            "out_q": 0,
+            "prob": 0.7,
+            "expected": 0.7
+          },
           "最終面接": {
             "count": 1,
             "out_q": 0,
@@ -29762,93 +29818,118 @@
         }
       },
       "古谷": {
-        "confirmed_decision_rate": 0.09722222222222222,
-        "historical_avg_rate": 0.05118145743145743,
-        "current_actual": 2335435.0,
-        "current_decisions": 2.0,
-        "additional_decisions_predicted": 0.0,
-        "total_decisions_predicted": 2.0,
-        "historical_decision_rate": 0.05118145743145743,
-        "predicted_decision_rate": 0.015151515151515152,
+        "confirmed_decision_rate": 0.015151515151515152,
+        "historical_avg_rate": 0.043605699855699856,
+        "current_actual": 0.0,
+        "current_decisions": 0.0,
+        "additional_decisions_predicted": 1.0,
+        "total_decisions_predicted": 1.0,
+        "historical_decision_rate": 0.043605699855699856,
+        "predicted_decision_rate": 0,
         "avg_unit_price": 1043550.5476190476,
-        "predicted_landing": 2335435,
-        "interviews": 132.0,
-        "pipeline_detail": {}
-      },
-      "嘉重": {
-        "confirmed_decision_rate": 0.0,
-        "historical_avg_rate": 0.11142135862913097,
-        "current_actual": 5743502.0,
-        "current_decisions": 5.0,
-        "additional_decisions_predicted": 2.3,
-        "total_decisions_predicted": 7.3,
-        "historical_decision_rate": 0.11142135862913097,
-        "predicted_decision_rate": 0.08902439024390243,
-        "avg_unit_price": 996865.8476190475,
-        "predicted_landing": 7678812,
-        "interviews": 82.0,
+        "predicted_landing": 616350,
+        "interviews": 0.0,
         "pipeline_detail": {
           "内定": {
-            "count": 2,
-            "out_q": 1,
+            "count": 1,
+            "out_q": 0,
             "prob": 0.7,
-            "expected": 1.4
+            "expected": 0.7
+          },
+          "最終面接": {
+            "count": 1,
+            "out_q": 0,
+            "prob": 0.3,
+            "expected": 0.3
+          }
+        }
+      },
+      "嘉重": {
+        "confirmed_decision_rate": 0.06097560975609756,
+        "historical_avg_rate": 0.08719157685762904,
+        "current_actual": 0.0,
+        "current_decisions": 0.0,
+        "additional_decisions_predicted": 3.3,
+        "total_decisions_predicted": 3.3,
+        "historical_decision_rate": 0.08719157685762904,
+        "predicted_decision_rate": 0,
+        "avg_unit_price": 996865.8476190475,
+        "predicted_landing": 3209310,
+        "interviews": 0.0,
+        "pipeline_detail": {
+          "内定": {
+            "count": 3,
+            "out_q": 0,
+            "prob": 0.7,
+            "expected": 2.1
           },
           "決定": {
             "count": 1,
             "out_q": 0,
             "prob": 0.9,
             "expected": 0.9
-          }
-        }
-      },
-      "百石": {
-        "confirmed_decision_rate": 0.036585365853658534,
-        "historical_avg_rate": 0.038667165494020106,
-        "current_actual": 3537200.0,
-        "current_decisions": 4.0,
-        "additional_decisions_predicted": 0.3,
-        "total_decisions_predicted": 4.3,
-        "historical_decision_rate": 0.038667165494020106,
-        "predicted_decision_rate": 0.03333333333333333,
-        "avg_unit_price": 676073.0666666667,
-        "predicted_landing": 3852200,
-        "interviews": 129.0,
-        "pipeline_detail": {
+          },
           "最終面接": {
             "count": 1,
-            "out_q": 2,
+            "out_q": 0,
             "prob": 0.3,
             "expected": 0.3
           }
         }
       },
+      "百石": {
+        "confirmed_decision_rate": 0.031007751937984496,
+        "historical_avg_rate": 0.0367523121050112,
+        "current_actual": 0.0,
+        "current_decisions": 0.0,
+        "additional_decisions_predicted": 1.6,
+        "total_decisions_predicted": 1.6,
+        "historical_decision_rate": 0.0367523121050112,
+        "predicted_decision_rate": 0,
+        "avg_unit_price": 676073.0666666667,
+        "predicted_landing": 1618500,
+        "interviews": 0.0,
+        "pipeline_detail": {
+          "内定": {
+            "count": 1,
+            "out_q": 0,
+            "prob": 0.7,
+            "expected": 0.7
+          },
+          "最終面接": {
+            "count": 3,
+            "out_q": 0,
+            "prob": 0.3,
+            "expected": 0.9
+          }
+        }
+      },
       "石丸": {
-        "confirmed_decision_rate": 0,
-        "historical_avg_rate": 0,
-        "current_actual": 744000.0,
-        "current_decisions": 1.0,
+        "confirmed_decision_rate": 0.015384615384615385,
+        "historical_avg_rate": 0.015384615384615385,
+        "current_actual": 0.0,
+        "current_decisions": 0.0,
         "additional_decisions_predicted": 0.0,
-        "total_decisions_predicted": 1.0,
-        "historical_decision_rate": 0,
-        "predicted_decision_rate": 0.015384615384615385,
+        "total_decisions_predicted": 0.0,
+        "historical_decision_rate": 0.015384615384615385,
+        "predicted_decision_rate": 0,
         "avg_unit_price": 744000.0,
-        "predicted_landing": 744000,
-        "interviews": 65.0,
+        "predicted_landing": 0,
+        "interviews": 0.0,
         "pipeline_detail": {}
       },
       "肥後": {
         "confirmed_decision_rate": 0,
         "historical_avg_rate": 0,
-        "current_actual": 0,
-        "current_decisions": 0,
+        "current_actual": 0.0,
+        "current_decisions": 0.0,
         "additional_decisions_predicted": 0.0,
         "total_decisions_predicted": 0.0,
         "historical_decision_rate": 0,
         "predicted_decision_rate": 0,
         "avg_unit_price": 1000000,
         "predicted_landing": 0,
-        "interviews": 0,
+        "interviews": 0.0,
         "pipeline_detail": {}
       }
     }
@@ -29866,5 +29947,5 @@
     "zero_target_1q": [],
     "joining_2q": []
   },
-  "current_quarter": "FY26/1Q"
+  "current_quarter": "FY26/2Q"
 }
