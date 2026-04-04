@@ -392,8 +392,14 @@ const ALL_QUARTERS = [
   'FY25/1Q','FY25/2Q','FY25/3Q','FY25/4Q',
   'FY26/1Q','FY26/2Q','FY26/3Q','FY26/4Q'
 ];
-function getCurrentQ(){ return DATA?.current_quarter || 'FY26/2Q'; }
-let SELECTED_PERIOD = 'FY26/2Q';
+function getCurrentQ(){
+  if(DATA?.current_quarter) return DATA.current_quarter;
+  // Auto-detect from date: Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec
+  const now=new Date();
+  const q=Math.floor(now.getMonth()/3)+1;
+  return `FY${now.getFullYear()%100}/${q}Q`;
+}
+let SELECTED_PERIOD = null; // Set from data on load
 let COMPARE_PERIOD = null;
 let COMPARE_ON = false;
 
@@ -1005,7 +1011,7 @@ function renderSummary(){
       const confirmedRate=oPred.confirmed_decision_rate||0;
       const predictedRate=oPred.predicted_decision_rate||0;
       const predictedLanding=oPred.predicted_landing||0;
-      const confirmedQ=oPred.confirmed_q_label||'FY25/4Q';
+      const confirmedQ=oPred.confirmed_q_label||DATA?.predictions?.overall?.confirmed_q_label||'N/A';
       const addlDec=oPred.additional_decisions_predicted||0;
       const curDec=oPred.current_decisions||0;
       const totalPredDec=oPred.total_decisions_predicted||0;
@@ -1235,10 +1241,18 @@ function renderLongTerm(){
     return { profit: 0, decisions: 0, interviews: 0, target: 0 };
   }
 
-  // --- Section 1: Year Summary Cards (4 cards: FY23, FY24, FY25, FY26 YTD) ---
-  const fyKeys = ['FY23','FY24','FY25','FY26'];
-  const fyColors = {'FY23':'#94a3b8','FY24':'#60a5fa','FY25':'#8b5cf6','FY26':'#f59e0b'};
-  const fyLabels = {'FY23':'FY23 年間実績','FY24':'FY24 年間実績','FY25':'FY25 年間実績','FY26':'FY26（YTD）'};
+  // --- Section 1: Year Summary Cards (dynamic from data) ---
+  const curFY = 'FY' + getCurrentQ().match(/FY(\d+)/)?.[1];
+  const allFYColors = ['#94a3b8','#60a5fa','#8b5cf6','#f59e0b','#ef4444','#10b981'];
+  // Build FY list dynamically from quarterly_trends
+  const fySet = new Set();
+  Object.keys(qt).forEach(k => { const m = k.match(/FY(\d+)/); if(m) fySet.add('FY'+m[1]); });
+  const fyKeys = [...fySet].sort();
+  const fyColors = {}; const fyLabels = {};
+  fyKeys.forEach((fy,i) => {
+    fyColors[fy] = allFYColors[i % allFYColors.length];
+    fyLabels[fy] = fy === curFY ? `${fy}（YTD）` : `${fy} 年間実績`;
+  });
 
   const cardsEl = document.getElementById('lt-year-cards');
   if(cardsEl){
@@ -1258,18 +1272,20 @@ function renderLongTerm(){
         if(prevAd && prevAd.actual > 0){
           const growth = ((profit - prevAd.actual) / prevAd.actual * 100);
           const cls = growth >= 0 ? 'kpi-up' : 'kpi-down';
-          if(fy === 'FY26'){
-            // For FY26 YTD, compare same completed quarters vs FY25
-            let fy25Same=0, fy26Same=0, compLabel='';
-            const cqNum = (DATA.current_quarter||'FY26/2Q').match(/(\d)Q/)?.[1]||'1';
+          if(fy === curFY && prevFy){
+            // For current FY YTD, compare same completed quarters vs previous FY
+            let prevSame=0, curSame=0, compLabel='';
+            const cqNum = getCurrentQ().match(/(\d)Q/)?.[1]||'1';
+            const prevFyNum = prevFy.replace('FY','');
+            const curFyNum = fy.replace('FY','');
             for(let qi=1;qi<=parseInt(cqNum);qi++){
-              fy25Same += qt[`FY25／${qi}Q`]?.actual || 0;
-              fy26Same += qt[`FY26／${qi}Q`]?.actual || 0;
+              prevSame += qt[`FY${prevFyNum}／${qi}Q`]?.actual || 0;
+              curSame += qt[`FY${curFyNum}／${qi}Q`]?.actual || 0;
             }
             compLabel = parseInt(cqNum)>1 ? `1-${cqNum}Q` : '1Q';
-            const q1g = fy25Same > 0 ? ((fy26Same - fy25Same) / fy25Same * 100) : 0;
+            const q1g = prevSame > 0 ? ((curSame - prevSame) / prevSame * 100) : 0;
             const q1cls = q1g >= 0 ? 'kpi-up' : 'kpi-down';
-            yoyHtml = `<div class="kpi-sub ${q1cls}">vs FY25 ${compLabel} ${q1g>=0?'+':''}${q1g.toFixed(1)}%</div>`;
+            yoyHtml = `<div class="kpi-sub ${q1cls}">vs ${prevFy} ${compLabel} ${q1g>=0?'+':''}${q1g.toFixed(1)}%</div>`;
           } else {
             yoyHtml = `<div class="kpi-sub ${cls}">YoY ${growth>=0?'+':''}${growth.toFixed(1)}%</div>`;
           }
@@ -1883,7 +1899,7 @@ function renderCA(){
   html+='</tbody>';
   document.getElementById('caTable').innerHTML=html;
 
-  const confirmedQ=pred.overall?.confirmed_q_label||'FY25/4Q';
+  const confirmedQ=pred.overall?.confirmed_q_label||DATA?.predictions?.overall?.confirmed_q_label||'N/A';
   // CA Detail Sections with issues
   const detailEl=document.getElementById('ca-detail-sections');
   let dhtml='';
@@ -2402,9 +2418,20 @@ function renderReferral(){
     const stages=['アサイン','初回面談','求人紹介','応募','1st面接','2nd面接','最終面接','内定','決定'];
     // Build datasets for available quarters
     const yoyDatasets=[];
-    const qColors={'FY24/1Q':'#d1d5db','FY24/2Q':'#e5e7eb','FY24/3Q':'#f3f4f6','FY24/4Q':'#9ca3af',
-      'FY25/1Q':'#94a3b8','FY25/2Q':'#cbd5e1','FY25/3Q':'#a5b4fc','FY25/4Q':'#60a5fa',
-      'FY26/1Q':'#f59e0b','FY26/2Q':'#f97316','FY26/3Q':'#ef4444','FY26/4Q':'#dc2626'};
+    // Dynamic quarter colors
+    const qColorPalettes=[
+      ['#d1d5db','#e5e7eb','#f3f4f6','#9ca3af'],  // FY24
+      ['#94a3b8','#cbd5e1','#a5b4fc','#60a5fa'],  // FY25
+      ['#f59e0b','#f97316','#ef4444','#dc2626'],  // FY26
+      ['#10b981','#34d399','#6ee7b7','#a7f3d0'],  // FY27+
+    ];
+    const qColors={};
+    ALL_QUARTERS.forEach(q=>{
+      const fyNum=parseInt(q.match(/FY(\d+)/)?.[1]||'0');
+      const qNum=parseInt(q.match(/(\d)Q/)?.[1]||'1')-1;
+      const palIdx=Math.min(fyNum-24, qColorPalettes.length-1);
+      qColors[q]=qColorPalettes[Math.max(0,palIdx)]?.[qNum]||'#64748b';
+    });
     const availQs=getAvailableQuarters();
     availQs.forEach(q=>{
       const yr=q.match(/FY(\d+)/)?.[1];

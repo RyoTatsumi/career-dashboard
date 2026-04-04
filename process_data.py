@@ -427,10 +427,9 @@ def extract_route_breakdown(wb):
     from collections import Counter, defaultdict
 
     def to_quarter(y, m):
-        if m <= 3: return f'FY{y-1}/4Q'
-        elif m <= 6: return f'FY{y}/1Q'
-        elif m <= 9: return f'FY{y}/2Q'
-        else: return f'FY{y}/3Q'
+        """Calendar year quarters: Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec."""
+        q = (m - 1) // 3 + 1
+        return f'FY{y}/{q}Q'
 
     route_map = {
         'ビズリーチ': 'ビズリーチ', 'ビズリーチ(A)': 'ビズリーチ',
@@ -496,8 +495,10 @@ def extract_route_breakdown(wb):
                 'rate': dec / total if total > 0 else 0,
             }
 
-    # Filter to only FY24+ quarters
-    valid_qs = {q for qs in route_quarterly.values() for q in qs if 'FY2024' in q or 'FY2025' in q or 'FY2026' in q}
+    # Filter to FY24+ quarters dynamically
+    current_year = datetime.now().year
+    valid_years = {str(y) for y in range(2024, current_year + 1)}
+    valid_qs = {q for qs in route_quarterly.values() for q in qs if any(yr in q for yr in valid_years)}
 
     return {
         'monthly': {k: dict(v) for k, v in route_monthly.items()},
@@ -959,15 +960,10 @@ def extract_ca_deep_analysis(wb, sales):
     }
 
     def to_quarter(dt):
+        """Calendar year quarters: Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec."""
         y, m = dt.year, dt.month
-        if m <= 3:
-            return f'FY{y-1}/4Q'
-        elif m <= 6:
-            return f'FY{y}/1Q'
-        elif m <= 9:
-            return f'FY{y}/2Q'
-        else:
-            return f'FY{y}/3Q'
+        q = (m - 1) // 3 + 1
+        return f'FY{y}/{q}Q'
 
     def parse_dt(v):
         if isinstance(v, datetime):
