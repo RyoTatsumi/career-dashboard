@@ -2335,11 +2335,28 @@ function renderReferral(){
   const spYear=sp.match(/FY(\d+)/)?.[1];
   const yearKey=spYear?String(parseInt(spYear)+2000):'2026';
 
-  // KPI cards - use selected period
+  // KPI cards - use selected period, fallback to YTD if selected Q has no data
   const totalYear=ref.years?.[yearKey]?.Total;
   const qAssign=totalYear?.['アサイン']?.[sp]||0;
   const qDecision=totalYear?.['決定']?.[sp]||0;
+  const hasRefQData = qAssign > 0 || qDecision > 0;
   const target=ref.targets||{};
+
+  // If no data for selected Q, compute YTD totals
+  let kpiLabel = sp;
+  let kpiAssign = qAssign, kpiDecision = qDecision;
+  let kpiCN = ref.years?.[yearKey]?.CN?.['アサイン']?.[sp]||0;
+  let kpiCS = ref.years?.[yearKey]?.CS?.['アサイン']?.[sp]||0;
+  if(!hasRefQData && totalYear){
+    kpiLabel = `FY${spYear} YTD`;
+    const allQs = Object.keys(totalYear['アサイン']||{});
+    kpiAssign = allQs.reduce((s,q)=>(totalYear['アサイン']?.[q]||0)+s,0);
+    kpiDecision = allQs.reduce((s,q)=>(totalYear['決定']?.[q]||0)+s,0);
+    const cnData = ref.years?.[yearKey]?.CN;
+    const csData = ref.years?.[yearKey]?.CS;
+    kpiCN = cnData ? allQs.reduce((s,q)=>(cnData['アサイン']?.[q]||0)+s,0) : 0;
+    kpiCS = csData ? allQs.reduce((s,q)=>(csData['アサイン']?.[q]||0)+s,0) : 0;
+  }
 
   document.getElementById('referral-kpis').innerHTML=`
     <div class="card card-sm">
@@ -2348,31 +2365,34 @@ function renderReferral(){
       <div class="kpi-sub kpi-neutral">Q目標: ${target.q_target}件</div>
     </div>
     <div class="card card-sm">
-      <div class="kpi-label">${sp} アサイン</div>
-      <div class="kpi-value">${fmtNum(qAssign)}件</div>
-      <div class="kpi-sub kpi-neutral">CN: ${ref.years?.[yearKey]?.CN?.['アサイン']?.[sp]||0} / CS: ${ref.years?.[yearKey]?.CS?.['アサイン']?.[sp]||0}</div>
+      <div class="kpi-label">${kpiLabel} アサイン</div>
+      <div class="kpi-value">${fmtNum(kpiAssign)}件</div>
+      <div class="kpi-sub kpi-neutral">CN: ${kpiCN} / CS: ${kpiCS}</div>
     </div>
     <div class="card card-sm">
-      <div class="kpi-label">${sp} 決定</div>
-      <div class="kpi-value">${fmtNum(qDecision)}件</div>
+      <div class="kpi-label">${kpiLabel} 決定</div>
+      <div class="kpi-value">${fmtNum(kpiDecision)}件</div>
       <div class="kpi-sub kpi-neutral">目標利益: ${fmtNum(target.profit_target)}万</div>
     </div>
   `;
 
-  // Update dynamic titles
-  const rft=document.getElementById('ref-funnel-title');if(rft)rft.textContent='リファラル ファネル（'+sp+'）';
-  const rct=document.getElementById('ref-cncs-title');if(rct)rct.textContent='CN vs CS 比較（'+sp+'）';
-  const rcatl=document.getElementById('ref-ca-title');if(rcatl)rcatl.textContent='CA別 リファラル実績（'+sp+'）';
+  // Update dynamic titles with actual data period
+  const funnelLabel = hasRefQData ? sp : `FY${spYear} YTD`;
+  const rft=document.getElementById('ref-funnel-title');if(rft)rft.textContent='リファラル ファネル（'+funnelLabel+'）';
+  const rct=document.getElementById('ref-cncs-title');if(rct)rct.textContent='CN vs CS 比較（'+funnelLabel+'）';
+  const rcatl=document.getElementById('ref-ca-title');if(rcatl)rcatl.textContent='CA別 リファラル実績（'+funnelLabel+'）';
 
-  // Funnel chart (Total)
+  // Funnel chart (Total) - use Q data or YTD
   if(totalYear){
     const stages=['アサイン','初回面談','求人紹介','応募','1st面接','2nd面接','最終面接','内定','決定'];
-    const vals=stages.map(s=>totalYear[s]?.[sp]||0);
+    const vals = hasRefQData
+      ? stages.map(s=>totalYear[s]?.[sp]||0)
+      : stages.map(s=>{const d=totalYear[s]||{}; return Object.values(d).reduce((a,v)=>a+(v||0),0);});
     makeChart('chartRefFunnel',{
       type:'bar',
       data:{
         labels:stages,
-        datasets:[{label:sp,data:vals,backgroundColor:stages.map((_,i)=>{
+        datasets:[{label:funnelLabel,data:vals,backgroundColor:stages.map((_,i)=>{
           const colors=['#3b82f6','#60a5fa','#93c5fd','#10b981','#34d399','#6ee7b7','#f59e0b','#fbbf24','#22c55e'];
           return colors[i]||'#94a3b8';
         }),borderRadius:4}]
@@ -2387,18 +2407,24 @@ function renderReferral(){
     });
   }
 
-  // CN vs CS - use selected period
+  // CN vs CS - use Q data or YTD
   const cn=ref.years?.[yearKey]?.CN;
   const cs=ref.years?.[yearKey]?.CS;
   if(cn&&cs){
     const stages=['アサイン','初回面談','求人紹介','応募','1st面接','2nd面接','最終面接','内定','決定'];
+    const cnVals = hasRefQData
+      ? stages.map(s=>cn[s]?.[sp]||0)
+      : stages.map(s=>{const d=cn[s]||{}; return Object.values(d).reduce((a,v)=>a+(v||0),0);});
+    const csVals = hasRefQData
+      ? stages.map(s=>cs[s]?.[sp]||0)
+      : stages.map(s=>{const d=cs[s]||{}; return Object.values(d).reduce((a,v)=>a+(v||0),0);});
     makeChart('chartRefCNCS',{
       type:'bar',
       data:{
         labels:stages,
         datasets:[
-          {label:'CN',data:stages.map(s=>cn[s]?.[sp]||0),backgroundColor:'#3b82f6',borderRadius:4},
-          {label:'CS',data:stages.map(s=>cs[s]?.[sp]||0),backgroundColor:'#f59e0b',borderRadius:4}
+          {label:'CN',data:cnVals,backgroundColor:'#3b82f6',borderRadius:4},
+          {label:'CS',data:csVals,backgroundColor:'#f59e0b',borderRadius:4}
         ]
       },
       options:{
@@ -2473,12 +2499,33 @@ function renderReferral(){
     });
   }
 
-  // CA breakdown - use selected year
+  // CA breakdown - use selected Q data, fallback to year total
   const caRef=ref['ca_'+yearKey];
   if(caRef){
     const cas=Object.keys(caRef).filter(c=>!isDeparted(c));
-    const intData=cas.map(c=>caRef[c]?.total_interviews||0);
-    const decData=cas.map(c=>caRef[c]?.total_decisions||0);
+    // Check if selected Q has any data
+    const hasQData = cas.some(c=>caRef[c]?.interviews?.[sp]>0 || caRef[c]?.decisions?.[sp]>0);
+    let intData, decData, caChartLabel;
+    if(hasQData){
+      // Show selected Q data
+      intData=cas.map(c=>caRef[c]?.interviews?.[sp]||0);
+      decData=cas.map(c=>caRef[c]?.decisions?.[sp]||0);
+      caChartLabel=sp;
+    } else {
+      // No data for selected Q yet, show YTD (sum of all Qs with data)
+      intData=cas.map(c=>{
+        const ints=caRef[c]?.interviews||{};
+        return Object.values(ints).reduce((s,v)=>s+(v||0),0);
+      });
+      decData=cas.map(c=>{
+        const decs=caRef[c]?.decisions||{};
+        return Object.values(decs).reduce((s,v)=>s+(v||0),0);
+      });
+      caChartLabel=`FY${spYear} YTD`;
+    }
+    // Update title with actual data period
+    const rcatl2=document.getElementById('ref-ca-title');
+    if(rcatl2) rcatl2.textContent=`CA別 リファラル実績（${caChartLabel}）`;
     makeChart('chartRefCA',{
       type:'bar',
       data:{
