@@ -437,9 +437,22 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;min-
       </div>
     </div>
 
+    <!-- Historical Pattern -->
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title">📊 過去Qの達成率カーブ（過去パターン継続シナリオ）</div>
+      <div id="weekly-historical-summary" style="margin-bottom:12px;"></div>
+      <div class="chart-wrap-lg"><canvas id="chartHistoricalCurve"></canvas></div>
+      <div style="margin-top:12px;padding:10px;background:#fffbeb;border-radius:8px;font-size:12px;color:#78350f;">
+        💡 <strong>2つの予測の使い分け</strong>: <br>
+        <span style="color:#3b82f6;">■ 統合予測 (A+B)</span> = 現スナップショット予測。確度UPを考慮しないため保守的。<br>
+        <span style="color:#10b981;">■ 過去Qパターン予測</span> = 過去Qの達成カーブを今期に適用。確度UP・新規流入を統計的に内包するため楽観的。<br>
+        <strong>2つの差分が大きいほど</strong>、確度UP/新規流入の<strong>余地（伸びしろ）</strong>が大きいことを意味する。
+      </div>
+    </div>
+
     <!-- Weekly Trend -->
     <div class="card" style="margin-top:20px;">
-      <div class="card-title">📈 着地予測の推移（30日）</div>
+      <div class="card-title">📈 着地予測の日次推移（30日）</div>
       <div class="chart-wrap-lg"><canvas id="chartWeeklyTrend"></canvas></div>
     </div>
 
@@ -3362,6 +3375,11 @@ function renderWeekly(){
   const fcChangeClass = fcChange >= 0 ? 'kpi-up' : 'kpi-down';
   const fcChangeSign = fcChange >= 0 ? '+' : '';
 
+  // 過去Qパターン予測
+  const histLanding = wr.historical_landing || 0;
+  const histRate = Math.round((wr.historical_final_rate || 0) * 100);
+  const histClass = histRate >= 100 ? 'kpi-up' : histRate >= 80 ? 'kpi-neutral' : 'kpi-down';
+
   document.getElementById('weekly-kpis').innerHTML = `
     <div class="card card-sm">
       <div class="kpi-label">${wr.quarter} 目標 / 残${wr.days_remaining}日</div>
@@ -3369,15 +3387,16 @@ function renderWeekly(){
       <div class="kpi-sub kpi-neutral">実績 ${fmtMoney(wr.q_actual)}（${Math.round(wr.q_actual/wr.q_target*100)}%）</div>
     </div>
     <div class="card card-sm">
-      <div class="kpi-label">統合着地予測（A+B）</div>
+      <div class="kpi-label">📦 統合予測 (A+B) <span style="font-size:10px;color:#94a3b8;">保守的</span></div>
       <div class="kpi-value">${fmtMoney(wr.integrated_forecast)}</div>
-      <div class="kpi-sub ${gapClass}">Gap: ${gapSign}${fmtMoney(gapAbs)}</div>
-      ${wc.forecast_change !== undefined ? `<div class="kpi-sub ${fcChangeClass}" style="margin-top:4px;">先週比 ${fcChangeSign}${fmtMoney(fcChange)}</div>` : ''}
+      <div class="kpi-sub ${gapClass}">${ach}% / Gap: ${gapSign}${fmtMoney(gapAbs)}</div>
+      ${wc.forecast_change !== undefined ? `<div class="kpi-sub ${fcChangeClass}" style="margin-top:4px;font-size:11px;">先週比 ${fcChangeSign}${fmtMoney(fcChange)}</div>` : ''}
     </div>
     <div class="card card-sm">
-      <div class="kpi-label">予測達成率</div>
-      <div class="kpi-value">${ach}%</div>
-      <div class="kpi-sub ${ach >= 100 ? 'kpi-up' : ach >= 80 ? 'kpi-neutral' : 'kpi-down'}">${ach >= 100 ? '達成見込み' : ach >= 80 ? '要追い込み' : 'Gap埋め必要'}</div>
+      <div class="kpi-label">📈 過去Qパターン予測 <span style="font-size:10px;color:#94a3b8;">楽観的</span></div>
+      <div class="kpi-value">${fmtMoney(histLanding)}</div>
+      <div class="kpi-sub ${histClass}">${histRate}% / Gap: ${histLanding >= wr.q_target ? '+' : '▲'}${fmtMoney(Math.abs(wr.q_target - histLanding))}</div>
+      <div class="kpi-sub kpi-neutral" style="font-size:11px;margin-top:4px;">過去Q平均カーブベース</div>
     </div>
   `;
 
@@ -3406,6 +3425,119 @@ function renderWeekly(){
       <span style="font-size:20px;font-weight:700;color:#92400e;">${fmtMoney(wr.integrated_forecast)}</span>
     </div>
   `;
+
+  // ===== Historical Q Curve Chart =====
+  const pastCurves = wr.past_q_curves || {};
+  const curCurve = wr.current_q_curve || [];
+  const avgCurve = wr.avg_curve || [];
+
+  if(Object.keys(pastCurves).length > 0){
+    const maxDays = Math.max(...Object.values(pastCurves).map(v => v.curve.length), curCurve.length, avgCurve.length, 91);
+    const labels = [];
+    for(let d=0; d<maxDays; d++) labels.push((d % 7 === 0 || d === maxDays-1) ? `${d}日` : '');
+
+    const datasets = [];
+    const colors = ['#94a3b8', '#cbd5e1'];
+    let ci = 0;
+    Object.keys(pastCurves).forEach(qk => {
+      const curveData = pastCurves[qk].curve.map(p => p.rate * 100);
+      datasets.push({
+        label: qk,
+        data: curveData,
+        borderColor: colors[ci % colors.length],
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0.2,
+        datalabels: {display: false},
+      });
+      ci++;
+    });
+    if(avgCurve.length > 0){
+      datasets.push({
+        label: '過去Q平均カーブ',
+        data: avgCurve.map(p => p.avg_rate * 100),
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16,185,129,0.1)',
+        borderWidth: 2.5,
+        borderDash: [4,2],
+        pointRadius: 0,
+        tension: 0.2,
+        datalabels: {display: false},
+        fill: true,
+      });
+    }
+    if(curCurve.length > 0){
+      datasets.push({
+        label: '現Q (FY26/2Q) 実績',
+        data: curCurve.map(p => p.rate * 100),
+        borderColor: '#3b82f6',
+        backgroundColor: 'transparent',
+        borderWidth: 3,
+        pointRadius: 0,
+        tension: 0.2,
+        datalabels: {display: false},
+      });
+    }
+    // 100% line
+    datasets.push({
+      label: '目標達成 100%',
+      data: Array(maxDays).fill(100),
+      borderColor: '#ef4444',
+      borderDash: [8,4],
+      pointRadius: 0,
+      borderWidth: 1.5,
+      datalabels: {display: false},
+    });
+
+    makeChart('chartHistoricalCurve', {
+      type: 'line',
+      data: {labels, datasets},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: {position: 'top', labels: {font: {size: 11}}},
+          datalabels: {display: false},
+          tooltip: {
+            callbacks: {
+              title: (items) => `Q開始から ${items[0].dataIndex}日経過`,
+              label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`,
+            }
+          }
+        },
+        scales: {
+          y: {grid:{color:'#f1f5f9'}, ticks:{callback: v => v+'%'}, title:{display:true,text:'達成率'}},
+          x: {grid:{display:false}, title:{display:true,text:'Q開始からの日数'}},
+        }
+      }
+    });
+
+    // Summary text
+    const cumulNow = curCurve.length > 0 ? curCurve[curCurve.length-1] : null;
+    const dayNow = cumulNow?.day || 0;
+    const avgAtToday = avgCurve[dayNow]?.avg_rate || 0;
+    const avgAtEnd = avgCurve[avgCurve.length-1]?.avg_rate || 0;
+    const summaryHtml = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;font-size:13px;">
+        <div style="padding:10px;background:#eff6ff;border-radius:8px;">
+          <div style="color:#1e40af;font-weight:600;margin-bottom:4px;">📍 今日 (Q+${dayNow}日)</div>
+          <div>実績: <strong>${fmtMoney(cumulNow?.cumul||0)}</strong></div>
+          <div>達成率: <strong>${((cumulNow?.rate||0)*100).toFixed(1)}%</strong></div>
+        </div>
+        <div style="padding:10px;background:#f0fdf4;border-radius:8px;">
+          <div style="color:#065f46;font-weight:600;margin-bottom:4px;">📊 過去Q平均（同日経過時）</div>
+          <div>平均達成率: <strong>${(avgAtToday*100).toFixed(1)}%</strong></div>
+          <div>${(cumulNow?.rate||0) >= avgAtToday ? '✅ 過去ペース上回り' : '⚠️ 過去ペース下回り'}</div>
+        </div>
+        <div style="padding:10px;background:#fef3c7;border-radius:8px;">
+          <div style="color:#78350f;font-weight:600;margin-bottom:4px;">🎯 過去Q末平均達成率</div>
+          <div>平均: <strong>${(avgAtEnd*100).toFixed(1)}%</strong></div>
+          <div>同パターン継続: <strong>${histRate}%</strong> 着地予測</div>
+        </div>
+      </div>
+    `;
+    document.getElementById('weekly-historical-summary').innerHTML = summaryHtml;
+  }
 
   // ===== Weekly Trend Chart =====
   const trend = wr.trend_data || [];

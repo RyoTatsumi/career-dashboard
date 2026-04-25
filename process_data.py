@@ -849,7 +849,7 @@ def _kakudo_breakdown(cands):
     return breakdown
 
 
-def build_weekly_report(yomi_forecast, sales, ca_funnel, kpi, ca_comparison, q_info, departed_cas):
+def build_weekly_report(yomi_forecast, sales, ca_funnel, kpi, ca_comparison, q_info, departed_cas, wb=None):
     """Build weekly report with landing predictions and improvement suggestions.
 
     Combines 3 prediction methods:
@@ -978,6 +978,106 @@ def build_weekly_report(yomi_forecast, sales, ca_funnel, kpi, ca_comparison, q_i
                         'ca': ca, 'name': c['name'], 'kakudo': c['kakudo'],
                         'status': c['status'], 'arari': c['arari'], 'kitai_arari': c['kitai_arari']
                     })
+
+    # ===== 過去Qの実達成率カーブ =====
+    # 過去Qの週次累積実績から「Q開始からX日後の平均達成率」を算出
+    ws_db = wb['DB_求職者一覧'] if (wb and 'DB_求職者一覧' in wb.sheetnames) else None
+    past_q_curves = {}  # {Q_key: [{day_offset, cumul_actual, achievement_rate}, ...]}
+    past_q_targets = {
+        'FY25/4Q': sales.get('合計', {}).get('quarterly', {}).get('FY25／4Q', {}).get('目標(粗利)', 0),
+        'FY26/1Q': sales.get('合計', {}).get('quarterly', {}).get('FY26／1Q', {}).get('目標(粗利)', 0),
+    }
+    if ws_db:
+        # 過去Q別に決定日ベースで週次集計
+        for q_key, q_start_y, q_start_m in [('FY25/4Q', 2025, 10), ('FY26/1Q', 2026, 1)]:
+            q_start_dt = datetime(q_start_y, q_start_m, 1)
+            # Q末
+            q_end_m = q_start_m + 2
+            if q_end_m == 12:
+                q_end_dt = datetime(q_start_y, 12, 31)
+            else:
+                q_end_dt = datetime(q_start_y, q_end_m + 1, 1) - __import__('datetime').timedelta(days=1)
+            past_q_target = past_q_targets.get(q_key, 0)
+            if past_q_target == 0:
+                continue
+
+            daily_decisions = defaultdict(float)
+            for r in range(3, ws_db.max_row + 1):
+                status = str(ws_db.cell(r, 2).value or '')
+                arari = parse_number(ws_db.cell(r, 11).value)
+                kettei_raw = ws_db.cell(r, 18).value
+                if status not in ('決定', '入社'):
+                    continue
+                if not isinstance(kettei_raw, (datetime, date)):
+                    continue
+                if q_start_dt <= kettei_raw <= q_end_dt:
+                    day_offset = (kettei_raw - q_start_dt).days
+                    daily_decisions[day_offset] += arari
+
+            # 累積カーブ
+            curve = []
+            cumul = 0
+            total_days = (q_end_dt - q_start_dt).days
+            for d in range(0, total_days + 1):
+                cumul += daily_decisions.get(d, 0)
+                curve.append({
+                    'day': d,
+                    'cumul': round(cumul),
+                    'rate': cumul / past_q_target if past_q_target > 0 else 0,
+                })
+            past_q_curves[q_key] = {'target': past_q_target, 'curve': curve}
+
+    # 過去Qの平均達成率カーブ（同じ日数経過時点での平均）
+    avg_curve = []
+    if past_q_curves:
+        max_days = min(len(v['curve']) for v in past_q_curves.values())
+        for d in range(max_days):
+            rates = [v['curve'][d]['rate'] for v in past_q_curves.values()]
+            avg_curve.append({
+                'day': d,
+                'avg_rate': sum(rates) / len(rates),
+            })
+
+    # 現Qの累積実績カーブ
+    current_q_curve = []
+    cumul_now = 0
+    if ws_db:
+        daily_decisions_cur = defaultdict(float)
+        for r in range(3, ws_db.max_row + 1):
+            status = str(ws_db.cell(r, 2).value or '')
+            arari = parse_number(ws_db.cell(r, 11).value)
+            kettei_raw = ws_db.cell(r, 18).value
+            if status not in ('決定', '入社'):
+                continue
+            if not isinstance(kettei_raw, (datetime, date)):
+                continue
+            if q_start <= kettei_raw <= q_end:
+                day_offset = (kettei_raw - q_start).days
+                daily_decisions_cur[day_offset] += arari
+
+        elapsed_days = (today - q_start).days
+        for d in range(0, elapsed_days + 1):
+            cumul_now += daily_decisions_cur.get(d, 0)
+            current_q_curve.append({
+                'day': d,
+                'cumul': round(cumul_now),
+                'rate': cumul_now / q_target if q_target > 0 else 0,
+            })
+
+    # 現Q末予測（過去Qパターン継続シナリオ）
+    historical_landing = 0
+    historical_final_rate = 0
+    if avg_curve and current_q_curve and len(current_q_curve) > 0:
+        cur_day = current_q_curve[-1]['day']
+        if cur_day < len(avg_curve):
+            avg_rate_at_today = avg_curve[cur_day]['avg_rate']
+            avg_rate_at_q_end = avg_curve[-1]['avg_rate'] if len(avg_curve) > 0 else 0
+            cur_rate_today = current_q_curve[-1]['rate']
+            # 過去のQ末/今日の比率 × 今日の実績 = Q末予測
+            if avg_rate_at_today > 0:
+                ratio = avg_rate_at_q_end / avg_rate_at_today
+                historical_landing = current_q_curve[-1]['cumul'] * ratio
+                historical_final_rate = historical_landing / q_target if q_target > 0 else 0
 
     # ----- 今日のスナップショット -----
     snapshot = {
@@ -1237,6 +1337,13 @@ def build_weekly_report(yomi_forecast, sales, ca_funnel, kpi, ca_comparison, q_i
 
         # 全体示唆
         'suggestions': suggestions,
+
+        # 過去Q達成率カーブ & 過去ペース継続予測
+        'past_q_curves': past_q_curves,
+        'avg_curve': avg_curve,
+        'current_q_curve': current_q_curve,
+        'historical_landing': round(historical_landing),
+        'historical_final_rate': historical_final_rate,
     }
 
 
@@ -2243,7 +2350,7 @@ def main():
         }
 
     print("Building weekly report...")
-    weekly_report = build_weekly_report(yomi_forecast, sales, ca_funnel, kpi, ca_comparison, q_info, departed_cas)
+    weekly_report = build_weekly_report(yomi_forecast, sales, ca_funnel, kpi, ca_comparison, q_info, departed_cas, wb)
     print(f"  Forecast: pipeline={weekly_report['pipeline_forecast']/10000:.0f}万, new={weekly_report['new_revenue_predicted']/10000:.0f}万, integrated={weekly_report['integrated_forecast']/10000:.0f}万")
     print(f"  Gap: {weekly_report['gap']/10000:.0f}万 / 達成率: {weekly_report['achievement_rate']*100:.0f}%")
 
