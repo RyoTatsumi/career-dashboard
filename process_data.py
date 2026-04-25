@@ -849,6 +849,390 @@ def _kakudo_breakdown(cands):
     return breakdown
 
 
+def build_weekly_report(yomi_forecast, sales, ca_funnel, kpi, ca_comparison, q_info, departed_cas):
+    """Build weekly report with landing predictions and improvement suggestions.
+
+    Combines 3 prediction methods:
+    A. 確定見込み (existing pipeline) — yomi_forecast.q_total
+    B. 新規面談からの予測 — (残日数 × 日次面談ペース) × 過去決定率 × 平均粗利
+    C. 統合予測 = A + B (後段で重複補正)
+
+    Compares with previous snapshot to show week-over-week trend.
+    Stores today's snapshot to data/weekly_snapshots/YYYY-MM-DD.json
+    """
+    import os
+    today = datetime.now()
+    today_key = today.strftime('%Y-%m-%d')
+    snapshot_dir = 'data/weekly_snapshots'
+    os.makedirs(snapshot_dir, exist_ok=True)
+
+    current_q_sales_key = q_info['current_q_sales']
+    q_end = q_info['q_end_date']
+    days_remaining = max(0, (q_end - today).days)
+    q_start = datetime(q_info['fy'], (q_info['q'] - 1) * 3 + 1, 1)
+    q_total_days = (q_end - q_start).days + 1
+    q_elapsed = (today - q_start).days + 1
+    q_progress = max(0, min(1, q_elapsed / q_total_days))
+
+    # ----- Q目標 / 実績 -----
+    total_sales_q = sales.get('合計', {}).get('quarterly', {}).get(current_q_sales_key, {})
+    q_target = total_sales_q.get('目標(粗利)', 0)
+    q_actual = total_sales_q.get('実績(粗利)', 0)
+    q_landing_db = total_sales_q.get('着地見込み', 0)  # スプシ上の着地見込み
+
+    # ----- 予測ロジック A: 既存パイプライン (ヨミ予測) -----
+    pipeline_forecast = yomi_forecast.get('company', {}).get('q_total', 0)
+
+    # ----- 予測ロジック B: 新規面談からの予測 -----
+    # 過去3か月の面談ペース・決定率・平均粗利を算出
+    funnel = ca_funnel.get('合計', ca_funnel.get('total', {})).get('funnel', {})
+
+    # 直近3か月の面談数
+    recent_months = []
+    for offset in range(1, 4):
+        m = today.month - offset
+        y = today.year
+        if m <= 0:
+            m += 12
+            y -= 1
+        recent_months.append(f'{y}-{m:02d}')
+
+    recent_interview_total = sum(funnel.get('初回面談', {}).get(m, 0) for m in recent_months)
+    days_in_3mo = 90
+    daily_interview_pace = recent_interview_total / days_in_3mo if recent_interview_total > 0 else 0
+
+    # 決定率: 過去6か月のデータから算出（より安定した数値）
+    # リードタイム2か月想定で、面談から決定までの転換率を計算
+    six_months = []
+    for offset in range(2, 8):  # 2-7か月前
+        m = today.month - offset
+        y = today.year
+        if m <= 0:
+            m += 12
+            y -= 1
+        six_months.append(f'{y}-{m:02d}')
+
+    six_months_decisions = []
+    for offset in range(0, 6):  # 直近6か月の決定
+        m = today.month - offset
+        y = today.year
+        if m <= 0:
+            m += 12
+            y -= 1
+        six_months_decisions.append(f'{y}-{m:02d}')
+
+    interviews_6mo = sum(funnel.get('初回面談', {}).get(m, 0) for m in six_months)
+    decisions_6mo = sum(funnel.get('決定', {}).get(m, 0) for m in six_months_decisions)
+    decision_rate = decisions_6mo / interviews_6mo if interviews_6mo > 0 else 0.05
+
+    # 平均粗利（過去Q）
+    prev_q_key = q_info['confirmed_q']
+    prev_q_data = sales.get('合計', {}).get('quarterly', {}).get(prev_q_key, {})
+    prev_q_decisions = prev_q_data.get('決定数', 1) or 1
+    prev_q_actual = prev_q_data.get('実績(粗利)', 0)
+    avg_profit_per_decision = prev_q_actual / prev_q_decisions if prev_q_decisions > 0 else 1100000
+
+    # 残日数 × 日次面談ペース → 残面談数
+    # ただしリードタイム2-3か月なので、Q末までの面談からは決定が遅れて出る
+    # → 「残面談数 × 決定率 × 平均粗利」だが、実際にQ内に着地するのは
+    #   面談実施から平均1.5か月以内に決まるもの = 残日数のうち45日まで
+    effective_days = min(days_remaining, 45)
+    new_interviews_predicted = effective_days * daily_interview_pace
+    new_decisions_predicted = new_interviews_predicted * decision_rate
+    new_revenue_predicted = new_decisions_predicted * avg_profit_per_decision
+
+    # ----- 統合予測 C -----
+    # A (既存パイプライン) には実績も含む。B (新規面談予測) は追加分
+    # 重複なし: A は今ある人の期待値、B はこれから面談する人
+    integrated_forecast = pipeline_forecast + new_revenue_predicted
+
+    # ----- Gap & 改善示唆 -----
+    gap = q_target - integrated_forecast
+    achievement_rate = integrated_forecast / q_target if q_target > 0 else 0
+
+    # 必要追加面談数 (Gap埋めに必要な数)
+    needed_decisions = gap / avg_profit_per_decision if avg_profit_per_decision > 0 and gap > 0 else 0
+    needed_interviews = needed_decisions / decision_rate if decision_rate > 0 and needed_decisions > 0 else 0
+
+    # 残日数で達成可能か
+    needed_daily_pace = needed_interviews / effective_days if effective_days > 0 else 0
+    pace_gap = needed_daily_pace - daily_interview_pace
+
+    # ----- ホット案件 (確度50%以上の合計) -----
+    hot_pipeline = 0
+    hot_count = 0
+    kakudo_up_targets = []  # 40-60%帯の確度UP候補
+    for ca, ca_data in yomi_forecast.get('by_ca', {}).items():
+        hot_pipeline += ca_data.get('q_high_zone', 0)
+        for i in range(3):
+            month_data = ca_data.get('monthly', {}).get(i, {})
+            for c in month_data.get('candidates', []):
+                if c.get('kakudo', 0) >= 50:
+                    hot_count += 1
+                if 40 <= c.get('kakudo', 0) <= 60:
+                    kakudo_up_targets.append({
+                        'ca': ca, 'name': c['name'], 'kakudo': c['kakudo'],
+                        'status': c['status'], 'arari': c['arari'], 'kitai_arari': c['kitai_arari']
+                    })
+
+    # ----- 今日のスナップショット -----
+    snapshot = {
+        'date': today_key,
+        'q_target': q_target,
+        'q_actual': q_actual,
+        'pipeline_forecast': pipeline_forecast,
+        'new_revenue_predicted': new_revenue_predicted,
+        'integrated_forecast': integrated_forecast,
+        'gap': gap,
+        'achievement_rate': achievement_rate,
+        'days_remaining': days_remaining,
+        'q_progress': q_progress,
+        'pipeline_count': yomi_forecast.get('total_candidates', 0),
+        'hot_pipeline': hot_pipeline,
+        'hot_count': hot_count,
+        'daily_interview_pace': daily_interview_pace,
+        'decision_rate': decision_rate,
+        'avg_profit_per_decision': avg_profit_per_decision,
+        'by_ca': {},
+    }
+
+    # ----- 個別CA -----
+    active_cas = [c for c in kpi.get('ca_names', []) if c not in departed_cas]
+    for ca in active_cas:
+        ca_yomi = yomi_forecast.get('by_ca', {}).get(ca, {})
+        ca_pipeline = ca_yomi.get('q_total', 0)
+        ca_target = ca_yomi.get('q_target', 0)
+
+        # CA別の面談ペース・決定率
+        ca_f = ca_funnel.get(ca, {}).get('funnel', {})
+        ca_recent_interviews = sum(ca_f.get('初回面談', {}).get(m, 0) for m in recent_months)
+        ca_daily_pace = ca_recent_interviews / 90 if ca_recent_interviews > 0 else 0
+
+        ca_int_6mo = sum(ca_f.get('初回面談', {}).get(m, 0) for m in six_months)
+        ca_dec_6mo = sum(ca_f.get('決定', {}).get(m, 0) for m in six_months_decisions)
+        ca_dec_rate = ca_dec_6mo / ca_int_6mo if ca_int_6mo > 0 else decision_rate
+
+        ca_new_int_pred = effective_days * ca_daily_pace
+        ca_new_dec_pred = ca_new_int_pred * ca_dec_rate
+        ca_new_rev_pred = ca_new_dec_pred * avg_profit_per_decision
+
+        ca_integrated = ca_pipeline + ca_new_rev_pred
+        ca_gap = ca_target - ca_integrated
+        ca_ach_rate = ca_integrated / ca_target if ca_target > 0 else 0
+
+        ca_needed_decisions = ca_gap / avg_profit_per_decision if avg_profit_per_decision > 0 and ca_gap > 0 else 0
+        ca_needed_interviews = ca_needed_decisions / ca_dec_rate if ca_dec_rate > 0 and ca_needed_decisions > 0 else 0
+
+        snapshot['by_ca'][ca] = {
+            'q_target': ca_target,
+            'pipeline_forecast': ca_pipeline,
+            'new_revenue_predicted': round(ca_new_rev_pred),
+            'integrated_forecast': round(ca_integrated),
+            'gap': round(ca_gap),
+            'achievement_rate': ca_ach_rate,
+            'daily_interview_pace': ca_daily_pace,
+            'decision_rate': ca_dec_rate,
+            'recent_interviews': ca_recent_interviews,
+            'needed_interviews': round(ca_needed_interviews),
+            'needed_decisions': round(ca_needed_decisions, 1),
+            'q_count': ca_yomi.get('q_count', 0),
+            'q_high_zone': ca_yomi.get('q_high_zone', 0),
+        }
+
+    # ----- 過去スナップショットを読み込んで週次比較 -----
+    past_snapshots = []
+    try:
+        for fname in sorted(os.listdir(snapshot_dir)):
+            if fname.endswith('.json') and fname != f'{today_key}.json':
+                fpath = os.path.join(snapshot_dir, fname)
+                with open(fpath, 'r', encoding='utf-8') as f:
+                    s = json.load(f)
+                if s.get('q_target', 0) == q_target:  # Same Q
+                    past_snapshots.append(s)
+    except Exception:
+        pass
+
+    # 7日前のスナップショット（または最も近い過去のもの）
+    week_ago_target = today - __import__('datetime').timedelta(days=7)
+    last_week_snapshot = None
+    if past_snapshots:
+        # Find closest snapshot within 5-9 days ago
+        for s in reversed(past_snapshots):
+            try:
+                s_date = datetime.strptime(s['date'], '%Y-%m-%d')
+                days_diff = (today - s_date).days
+                if 5 <= days_diff <= 9:
+                    last_week_snapshot = s
+                    break
+            except Exception:
+                continue
+        if not last_week_snapshot:
+            last_week_snapshot = past_snapshots[-1]  # Most recent past
+
+    # 週次変化
+    weekly_change = {}
+    if last_week_snapshot:
+        weekly_change = {
+            'last_date': last_week_snapshot.get('date'),
+            'forecast_change': integrated_forecast - last_week_snapshot.get('integrated_forecast', 0),
+            'forecast_change_pct': (integrated_forecast / last_week_snapshot.get('integrated_forecast', 1) - 1) if last_week_snapshot.get('integrated_forecast', 0) > 0 else 0,
+            'pipeline_change': pipeline_forecast - last_week_snapshot.get('pipeline_forecast', 0),
+            'hot_pipeline_change': hot_pipeline - last_week_snapshot.get('hot_pipeline', 0),
+            'achievement_change': achievement_rate - last_week_snapshot.get('achievement_rate', 0),
+            'pace_change': daily_interview_pace - last_week_snapshot.get('daily_interview_pace', 0),
+            'last_forecast': last_week_snapshot.get('integrated_forecast', 0),
+            'last_pipeline': last_week_snapshot.get('pipeline_forecast', 0),
+            'last_hot': last_week_snapshot.get('hot_pipeline', 0),
+        }
+
+    # 過去30日のトレンド
+    trend_data = []
+    for s in past_snapshots[-30:]:
+        trend_data.append({
+            'date': s.get('date'),
+            'forecast': s.get('integrated_forecast', 0),
+            'pipeline': s.get('pipeline_forecast', 0),
+            'hot': s.get('hot_pipeline', 0),
+            'achievement': s.get('achievement_rate', 0),
+        })
+    # Add today
+    trend_data.append({
+        'date': today_key,
+        'forecast': integrated_forecast,
+        'pipeline': pipeline_forecast,
+        'hot': hot_pipeline,
+        'achievement': achievement_rate,
+    })
+
+    # CA別の週次変化
+    ca_weekly_change = {}
+    if last_week_snapshot:
+        for ca in active_cas:
+            last_ca = last_week_snapshot.get('by_ca', {}).get(ca, {})
+            cur_ca = snapshot['by_ca'].get(ca, {})
+            ca_weekly_change[ca] = {
+                'forecast_change': cur_ca.get('integrated_forecast', 0) - last_ca.get('integrated_forecast', 0),
+                'pipeline_change': cur_ca.get('pipeline_forecast', 0) - last_ca.get('pipeline_forecast', 0),
+                'hot_change': cur_ca.get('q_high_zone', 0) - last_ca.get('q_high_zone', 0),
+            }
+
+    # ----- 改善示唆 -----
+    suggestions = []
+    if gap > 0:
+        suggestions.append({
+            'type': 'gap',
+            'priority': 'high',
+            'message': f'Gap ▲{gap/10000:.0f}万円を埋めるには、追加で{needed_decisions:.1f}件の決定（{needed_interviews:.0f}件の新規面談）が必要',
+        })
+        if pace_gap > 0:
+            suggestions.append({
+                'type': 'pace',
+                'priority': 'high',
+                'message': f'必要日次面談ペース {needed_daily_pace:.1f}件/日 > 現状 {daily_interview_pace:.1f}件/日 → 日次+{pace_gap:.1f}件UP必須',
+            })
+    if hot_count > 0:
+        suggestions.append({
+            'type': 'hot',
+            'priority': 'medium',
+            'message': f'ホット案件（50%以上）{hot_count}名・{hot_pipeline/10000:.0f}万円 → クロージング集中',
+        })
+    if len(kakudo_up_targets) > 0:
+        kakudo_up_targets.sort(key=lambda x: -x['arari'])
+        top_targets = kakudo_up_targets[:5]
+        suggestions.append({
+            'type': 'kakudo_up',
+            'priority': 'high',
+            'message': f'確度UP候補（40-60%帯）{len(kakudo_up_targets)}名 → 上位{len(top_targets)}名のフェーズアップに注力',
+            'targets': top_targets,
+        })
+
+    # CA別の示唆
+    ca_suggestions = {}
+    for ca in active_cas:
+        cd = snapshot['by_ca'].get(ca, {})
+        ca_sugs = []
+        ca_gap = cd.get('gap', 0)
+        if ca_gap > 0:
+            ca_sugs.append({
+                'type': 'gap',
+                'message': f'Gap ▲{ca_gap/10000:.0f}万 → 追加{cd.get("needed_decisions",0)}件決定 / {cd.get("needed_interviews",0)}件面談必要',
+            })
+        ca_pace = cd.get('daily_interview_pace', 0)
+        if ca_pace < daily_interview_pace * 0.7 and len(active_cas) > 0:
+            avg_pace = daily_interview_pace / len(active_cas)
+            if ca_pace < avg_pace * 0.7:
+                ca_sugs.append({
+                    'type': 'pace',
+                    'message': f'面談ペース{ca_pace:.2f}件/日 (チーム平均{avg_pace:.2f}件/日) → ペースUP必要',
+                })
+        ca_dr = cd.get('decision_rate', 0)
+        if ca_dr < decision_rate * 0.7 and ca_dr > 0:
+            ca_sugs.append({
+                'type': 'rate',
+                'message': f'決定率{ca_dr*100:.1f}% (チーム{decision_rate*100:.1f}%) → 質の改善余地',
+            })
+        ca_suggestions[ca] = ca_sugs
+
+    # ----- スナップショット保存 -----
+    try:
+        with open(os.path.join(snapshot_dir, f'{today_key}.json'), 'w', encoding='utf-8') as f:
+            json.dump(snapshot, f, ensure_ascii=False, indent=2, default=str)
+    except Exception as e:
+        print(f"  Warning: snapshot save failed: {e}")
+
+    return {
+        'generated_at': today.strftime('%Y-%m-%d %H:%M'),
+        'quarter': q_info['current_q_funnel'],
+        'q_target': q_target,
+        'q_actual': q_actual,
+        'q_landing_db': q_landing_db,
+        'days_remaining': days_remaining,
+        'q_progress': q_progress,
+
+        # 予測内訳
+        'pipeline_forecast': round(pipeline_forecast),
+        'new_revenue_predicted': round(new_revenue_predicted),
+        'integrated_forecast': round(integrated_forecast),
+        'gap': round(gap),
+        'achievement_rate': achievement_rate,
+
+        # 予測ロジックの内訳（説明用）
+        'forecast_logic': {
+            'daily_interview_pace': round(daily_interview_pace, 2),
+            'decision_rate': decision_rate,
+            'avg_profit_per_decision': round(avg_profit_per_decision),
+            'recent_interview_total': recent_interview_total,
+            'recent_months': recent_months,
+            'effective_days': effective_days,
+            'new_interviews_predicted': round(new_interviews_predicted),
+            'new_decisions_predicted': round(new_decisions_predicted, 1),
+        },
+
+        # 改善示唆
+        'needed_interviews': round(needed_interviews),
+        'needed_decisions': round(needed_decisions, 1),
+        'needed_daily_pace': round(needed_daily_pace, 2),
+        'pace_gap': round(pace_gap, 2),
+
+        # ホット案件
+        'hot_pipeline': round(hot_pipeline),
+        'hot_count': hot_count,
+        'kakudo_up_targets': kakudo_up_targets[:10],
+
+        # 週次変化
+        'weekly_change': weekly_change,
+        'trend_data': trend_data,
+        'ca_weekly_change': ca_weekly_change,
+
+        # CA別
+        'by_ca': snapshot['by_ca'],
+        'ca_suggestions': ca_suggestions,
+
+        # 全体示唆
+        'suggestions': suggestions,
+    }
+
+
 def extract_kpi_summary(wb):
     ws = wb['KPIダッシュボード']
     ca_names = []
@@ -1851,6 +2235,11 @@ def main():
             'is_zero_target': ca in zero_target_cas,
         }
 
+    print("Building weekly report...")
+    weekly_report = build_weekly_report(yomi_forecast, sales, ca_funnel, kpi, ca_comparison, q_info, departed_cas)
+    print(f"  Forecast: pipeline={weekly_report['pipeline_forecast']/10000:.0f}万, new={weekly_report['new_revenue_predicted']/10000:.0f}万, integrated={weekly_report['integrated_forecast']/10000:.0f}万")
+    print(f"  Gap: {weekly_report['gap']/10000:.0f}万 / 達成率: {weekly_report['achievement_rate']*100:.0f}%")
+
     funnel_data = {}
     if 'total' not in ca_funnel and '合計' in ca_funnel:
         funnel_data['total'] = ca_funnel['合計']
@@ -2652,6 +3041,7 @@ def main():
         'ca_deep_analysis': ca_deep_analysis,
         'predictions': predictions,
         'yomi_forecast': yomi_forecast,
+        'weekly_report': weekly_report,
         'lead_time_months': lead_time_months,
         'ca_status': {
             'departed': departed_cas,

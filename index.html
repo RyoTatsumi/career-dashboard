@@ -164,6 +164,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;min-
   <button class="tab-btn" data-tab="route" onclick="showTab('route')">経路別分析</button>
   <button class="tab-btn" data-tab="referral" onclick="showTab('referral')">リファラル</button>
   <button class="tab-btn" data-tab="yomi" onclick="showTab('yomi')">ヨミ予測</button>
+  <button class="tab-btn" data-tab="weekly" onclick="showTab('weekly')">週間レポート</button>
 </nav>
 
 <!-- Period Selector (hidden - auto-selected) -->
@@ -392,6 +393,76 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;min-
     </div>
   </div>
 
+  <!-- TAB: 週間レポート -->
+  <div id="tab-weekly" class="tab-content">
+    <!-- KPI Cards -->
+    <div class="grid-3" id="weekly-kpis"></div>
+
+    <!-- Forecast Logic Breakdown -->
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title">📐 着地予測の内訳（A: パイプライン + B: 新規面談予測）</div>
+      <div id="weekly-forecast-breakdown"></div>
+    </div>
+
+    <!-- Adjustable Parameters -->
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title">🎛 シミュレーション（パラメータを調整して再計算）</div>
+      <div id="weekly-simulator" style="padding:8px 0;">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:end;">
+          <div>
+            <label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px;">日次面談ペース (件/日)</label>
+            <input type="range" id="sim-pace" min="0" max="30" step="0.5" value="0" style="width:100%">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;"><span>0</span><span id="sim-pace-val">0</span><span>30</span></div>
+          </div>
+          <div>
+            <label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px;">決定率 (%)</label>
+            <input type="range" id="sim-rate" min="0" max="20" step="0.5" value="0" style="width:100%">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;"><span>0</span><span id="sim-rate-val">0%</span><span>20%</span></div>
+          </div>
+          <div>
+            <label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px;">確度UP率 (40-60%帯がフェーズUP)</label>
+            <input type="range" id="sim-kakudo" min="0" max="100" step="5" value="0" style="width:100%">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;"><span>0%</span><span id="sim-kakudo-val">0%</span><span>100%</span></div>
+          </div>
+        </div>
+        <div style="margin-top:16px;padding:12px;background:#f0f9ff;border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:13px;color:#334155;">シミュレーション結果:</span>
+          <span id="sim-result" style="font-size:18px;font-weight:600;color:#3b82f6;">-</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Weekly Trend -->
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title">📈 着地予測の推移（30日）</div>
+      <div class="chart-wrap-lg"><canvas id="chartWeeklyTrend"></canvas></div>
+    </div>
+
+    <!-- Improvement Suggestions -->
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title">💡 改善示唆 / 今週の動き</div>
+      <div id="weekly-suggestions"></div>
+    </div>
+
+    <!-- 確度UP候補 -->
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title">🚀 確度UP候補（40-60%帯のクロージング集中対象）</div>
+      <div id="weekly-kakudo-up" style="overflow-x:auto;"></div>
+    </div>
+
+    <!-- CA Detail Table -->
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title">👥 CA別 週間レポート</div>
+      <div id="weekly-ca-table" style="overflow-x:auto;"></div>
+    </div>
+
+    <!-- CA-level Suggestions -->
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title">📋 CA別 改善示唆</div>
+      <div id="weekly-ca-suggestions"></div>
+    </div>
+  </div>
+
 </main>
 
 <!-- CA Detail Modal -->
@@ -614,6 +685,7 @@ function renderAll(){
   renderRoute();
   renderReferral();
   renderYomi();
+  renderWeekly();
 }
 
 // ===== TAB: 概要 =====
@@ -3263,6 +3335,236 @@ function renderYomi(){
   });
 
   document.getElementById('yomi-pipeline-table').innerHTML = pipeHtml;
+}
+
+// ===== TAB: 週間レポート =====
+function renderWeekly(){
+  const wr = DATA.weekly_report;
+  if(!wr){
+    document.getElementById('weekly-kpis').innerHTML = '<div class="card"><p>週間レポートデータがありません</p></div>';
+    return;
+  }
+
+  // ===== KPI Cards =====
+  const gap = wr.gap;
+  const gapClass = gap <= 0 ? 'kpi-up' : 'kpi-down';
+  const gapSign = gap <= 0 ? '+' : '▲';
+  const gapAbs = Math.abs(gap);
+  const ach = Math.round(wr.achievement_rate * 100);
+
+  const wc = wr.weekly_change || {};
+  const fcChange = wc.forecast_change || 0;
+  const fcChangeClass = fcChange >= 0 ? 'kpi-up' : 'kpi-down';
+  const fcChangeSign = fcChange >= 0 ? '+' : '';
+
+  document.getElementById('weekly-kpis').innerHTML = `
+    <div class="card card-sm">
+      <div class="kpi-label">${wr.quarter} 目標 / 残${wr.days_remaining}日</div>
+      <div class="kpi-value">${fmtMoney(wr.q_target)}</div>
+      <div class="kpi-sub kpi-neutral">実績 ${fmtMoney(wr.q_actual)}（${Math.round(wr.q_actual/wr.q_target*100)}%）</div>
+    </div>
+    <div class="card card-sm">
+      <div class="kpi-label">統合着地予測（A+B）</div>
+      <div class="kpi-value">${fmtMoney(wr.integrated_forecast)}</div>
+      <div class="kpi-sub ${gapClass}">Gap: ${gapSign}${fmtMoney(gapAbs)}</div>
+      ${wc.forecast_change !== undefined ? `<div class="kpi-sub ${fcChangeClass}" style="margin-top:4px;">先週比 ${fcChangeSign}${fmtMoney(fcChange)}</div>` : ''}
+    </div>
+    <div class="card card-sm">
+      <div class="kpi-label">予測達成率</div>
+      <div class="kpi-value">${ach}%</div>
+      <div class="kpi-sub ${ach >= 100 ? 'kpi-up' : ach >= 80 ? 'kpi-neutral' : 'kpi-down'}">${ach >= 100 ? '達成見込み' : ach >= 80 ? '要追い込み' : 'Gap埋め必要'}</div>
+    </div>
+  `;
+
+  // ===== Forecast Logic Breakdown =====
+  const fl = wr.forecast_logic || {};
+  document.getElementById('weekly-forecast-breakdown').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px;">
+      <div style="padding:16px;background:#eff6ff;border-radius:12px;border-left:4px solid #3b82f6;">
+        <div style="font-size:13px;color:#1e40af;font-weight:600;margin-bottom:8px;">🟦 A. 既存パイプライン予測</div>
+        <div style="font-size:24px;font-weight:700;color:#1e40af;">${fmtMoney(wr.pipeline_forecast)}</div>
+        <div style="font-size:12px;color:#475569;margin-top:6px;">現在パイプラインにいる候補者の<br>確度% × 粗利の合計（ヨミ予測タブ参照）</div>
+      </div>
+      <div style="padding:16px;background:#f0fdf4;border-radius:12px;border-left:4px solid #10b981;">
+        <div style="font-size:13px;color:#065f46;font-weight:600;margin-bottom:8px;">🟩 B. 新規面談からの予測</div>
+        <div style="font-size:24px;font-weight:700;color:#065f46;">${fmtMoney(wr.new_revenue_predicted)}</div>
+        <div style="font-size:12px;color:#475569;margin-top:6px;">残${fl.effective_days}日 × 日次面談${fl.daily_interview_pace}件 = ${fl.new_interviews_predicted}件<br>× 決定率${(fl.decision_rate*100).toFixed(1)}% × 平均粗利${fmtMoney(fl.avg_profit_per_decision)}</div>
+      </div>
+    </div>
+    <div style="margin-top:16px;padding:12px;background:#fef3c7;border-radius:8px;text-align:center;">
+      <span style="font-size:13px;color:#78350f;">統合予測 = A + B = </span>
+      <span style="font-size:20px;font-weight:700;color:#92400e;">${fmtMoney(wr.integrated_forecast)}</span>
+    </div>
+  `;
+
+  // ===== Weekly Trend Chart =====
+  const trend = wr.trend_data || [];
+  if(trend.length > 0){
+    const labels = trend.map(t => t.date.substring(5));
+    const fcData = trend.map(t => t.forecast / 10000);
+    const pipeData = trend.map(t => t.pipeline / 10000);
+    const targetLine = Array(trend.length).fill(wr.q_target / 10000);
+
+    makeChart('chartWeeklyTrend', {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {label:'統合予測 (A+B)', data:fcData, borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.1)', fill:true, tension:0.3, borderWidth:3, pointRadius:3, datalabels:{display:false}},
+          {label:'パイプラインのみ (A)', data:pipeData, borderColor:'#10b981', borderDash:[5,3], pointRadius:2, tension:0.3, borderWidth:2, fill:false, datalabels:{display:false}},
+          {label:'Q目標', data:targetLine, borderColor:'#ef4444', borderDash:[8,4], pointRadius:0, borderWidth:2, fill:false, datalabels:{display:false}}
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins: {
+          legend:{position:'top',labels:{font:{size:11}}},
+          datalabels:{display:false}
+        },
+        scales: {
+          y:{grid:{color:'#f1f5f9'},ticks:{callback:v=>v+'万'}},
+          x:{grid:{display:false}}
+        }
+      }
+    });
+  }
+
+  // ===== Suggestions =====
+  const sugs = wr.suggestions || [];
+  let sugsHtml = '';
+  sugs.forEach(s => {
+    const bg = s.priority === 'high' ? '#fef2f2' : s.priority === 'medium' ? '#fffbeb' : '#f0f9ff';
+    const border = s.priority === 'high' ? '#ef4444' : s.priority === 'medium' ? '#f59e0b' : '#3b82f6';
+    const icon = s.priority === 'high' ? '🔴' : s.priority === 'medium' ? '🟡' : '🔵';
+    sugsHtml += `<div style="margin-top:10px;padding:12px;background:${bg};border-left:4px solid ${border};border-radius:8px;font-size:13px;color:#334155;">${icon} ${s.message}</div>`;
+  });
+  if(sugsHtml === '') sugsHtml = '<p style="color:#64748b;">該当する示唆なし</p>';
+  document.getElementById('weekly-suggestions').innerHTML = sugsHtml;
+
+  // ===== 確度UP候補 =====
+  const ups = wr.kakudo_up_targets || [];
+  let upsHtml = '';
+  if(ups.length > 0){
+    upsHtml = '<table class="data-table"><thead><tr>';
+    upsHtml += '<th>CA</th><th>候補者名</th><th>現確度</th><th>ステータス</th><th class="num">粗利</th><th class="num">期待値</th></tr></thead><tbody>';
+    ups.forEach(t => {
+      const kakudoColor = t.kakudo >= 60 ? '#3b82f6' : t.kakudo >= 50 ? '#06b6d4' : '#f59e0b';
+      upsHtml += `<tr>
+        <td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${CA_COLORS[t.ca]||'#64748b'};margin-right:6px;"></span>${t.ca}</td>
+        <td>${t.name}</td>
+        <td><span style="display:inline-block;padding:2px 8px;border-radius:4px;background:${kakudoColor};color:white;font-size:11px;font-weight:600;">${t.kakudo}%</span></td>
+        <td>${t.status}</td>
+        <td class="num">${fmtMoney(t.arari)}</td>
+        <td class="num" style="font-weight:600;">${fmtMoney(t.kitai_arari)}</td>
+      </tr>`;
+    });
+    upsHtml += '</tbody></table>';
+  } else {
+    upsHtml = '<p style="color:#64748b;">確度UP候補なし</p>';
+  }
+  document.getElementById('weekly-kakudo-up').innerHTML = upsHtml;
+
+  // ===== CA Table =====
+  const departed = DATA.ca_status?.departed || [];
+  const activeCAs = (DATA.kpi?.ca_names||[]).filter(c => !departed.includes(c));
+  const caTable = wr.by_ca || {};
+  const caChange = wr.ca_weekly_change || {};
+
+  let caHtml = '<table class="data-table"><thead><tr>';
+  caHtml += '<th>CA</th><th class="num">Q目標</th><th class="num">A: パイプ</th><th class="num">B: 新規面談</th><th class="num">統合予測</th><th class="num">Gap</th><th class="num">達成率</th><th class="num">必要面談</th><th class="num">必要決定</th><th class="num">日次ペース</th><th class="num">先週比</th></tr></thead><tbody>';
+  activeCAs.sort((a,b)=>(caTable[b]?.integrated_forecast||0)-(caTable[a]?.integrated_forecast||0));
+  activeCAs.forEach(ca => {
+    const d = caTable[ca]; if(!d) return;
+    const cgap = d.gap || 0;
+    const gapStr = cgap <= 0 ? `<span style="color:#10b981;font-weight:600">+${fmtMoney(Math.abs(cgap))}</span>` : `<span style="color:#ef4444;font-weight:600">▲${fmtMoney(cgap)}</span>`;
+    const ach = Math.round((d.achievement_rate||0)*100);
+    const achColor = ach >= 100 ? '#10b981' : ach >= 80 ? '#f59e0b' : '#ef4444';
+    const cChange = caChange[ca]?.forecast_change || 0;
+    const cChangeStr = cChange === 0 ? '-' : cChange > 0 ? `<span style="color:#10b981">+${fmtMoney(cChange)}</span>` : `<span style="color:#ef4444">${fmtMoney(cChange)}</span>`;
+    caHtml += `<tr>
+      <td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${CA_COLORS[ca]||'#64748b'};margin-right:6px;"></span>${ca}</td>
+      <td class="num">${fmtMoney(d.q_target||0)}</td>
+      <td class="num">${fmtMoney(d.pipeline_forecast||0)}</td>
+      <td class="num">${fmtMoney(d.new_revenue_predicted||0)}</td>
+      <td class="num" style="font-weight:600;">${fmtMoney(d.integrated_forecast||0)}</td>
+      <td class="num">${gapStr}</td>
+      <td class="num" style="color:${achColor};font-weight:600">${ach}%</td>
+      <td class="num">${d.needed_interviews||0}件</td>
+      <td class="num">${d.needed_decisions||0}件</td>
+      <td class="num">${(d.daily_interview_pace||0).toFixed(1)}件/日</td>
+      <td class="num">${cChangeStr}</td>
+    </tr>`;
+  });
+  caHtml += '</tbody></table>';
+  document.getElementById('weekly-ca-table').innerHTML = caHtml;
+
+  // ===== CA Suggestions =====
+  const caSugs = wr.ca_suggestions || {};
+  let caSugsHtml = '';
+  activeCAs.forEach(ca => {
+    const sugList = caSugs[ca] || [];
+    if(sugList.length === 0) return;
+    caSugsHtml += `<div style="margin-top:12px;padding:12px;background:#f8fafc;border-radius:8px;border-left:3px solid ${CA_COLORS[ca]||'#64748b'};">`;
+    caSugsHtml += `<div style="font-weight:600;font-size:13px;color:#334155;margin-bottom:6px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${CA_COLORS[ca]||'#64748b'};margin-right:6px;"></span>${ca}</div>`;
+    sugList.forEach(s => {
+      const icon = s.type === 'gap' ? '🎯' : s.type === 'pace' ? '⏩' : '📊';
+      caSugsHtml += `<div style="font-size:12px;color:#475569;padding:2px 0;">${icon} ${s.message}</div>`;
+    });
+    caSugsHtml += '</div>';
+  });
+  if(caSugsHtml === '') caSugsHtml = '<p style="color:#64748b;">該当する示唆なし</p>';
+  document.getElementById('weekly-ca-suggestions').innerHTML = caSugsHtml;
+
+  // ===== Simulator =====
+  setupWeeklySimulator(wr);
+}
+
+function setupWeeklySimulator(wr){
+  const fl = wr.forecast_logic || {};
+  const initPace = fl.daily_interview_pace || 0;
+  const initRate = (fl.decision_rate || 0) * 100;
+  const initKakudo = 30; // 30% of 40-60% 帯がフェーズUPする想定
+
+  const paceEl = document.getElementById('sim-pace');
+  const rateEl = document.getElementById('sim-rate');
+  const kakudoEl = document.getElementById('sim-kakudo');
+
+  paceEl.value = initPace;
+  rateEl.value = initRate;
+  kakudoEl.value = initKakudo;
+  document.getElementById('sim-pace-val').textContent = initPace.toFixed(1);
+  document.getElementById('sim-rate-val').textContent = initRate.toFixed(1)+'%';
+  document.getElementById('sim-kakudo-val').textContent = initKakudo+'%';
+
+  function recalc(){
+    const pace = parseFloat(paceEl.value);
+    const rate = parseFloat(rateEl.value) / 100;
+    const kakudoUp = parseFloat(kakudoEl.value) / 100;
+    document.getElementById('sim-pace-val').textContent = pace.toFixed(1);
+    document.getElementById('sim-rate-val').textContent = (rate*100).toFixed(1)+'%';
+    document.getElementById('sim-kakudo-val').textContent = (kakudoUp*100).toFixed(0)+'%';
+
+    const newInt = (fl.effective_days || 45) * pace;
+    const newDec = newInt * rate;
+    const newRev = newDec * (fl.avg_profit_per_decision || 1100000);
+
+    // 確度UP boost: 40-60%帯がフェーズUPすると、その差分が増える
+    // 簡易計算: 確度UP候補の合計期待値 × (kakudoUp × 0.3) を加算（30%確度UPと仮定）
+    const ups = wr.kakudo_up_targets || [];
+    const upBoost = ups.reduce((s,t) => s + (t.arari * 0.3), 0) * kakudoUp;
+
+    const integrated = (wr.pipeline_forecast || 0) + newRev + upBoost;
+    const gap = (wr.q_target || 0) - integrated;
+    const ach = wr.q_target > 0 ? Math.round(integrated / wr.q_target * 100) : 0;
+    const gapStr = gap <= 0 ? `<span style="color:#10b981">+${fmtMoney(Math.abs(gap))}</span>` : `<span style="color:#ef4444">▲${fmtMoney(gap)}</span>`;
+
+    document.getElementById('sim-result').innerHTML = `予測 ${fmtMoney(integrated)} / Gap ${gapStr} / 達成率 ${ach}%`;
+  }
+
+  paceEl.oninput = recalc;
+  rateEl.oninput = recalc;
+  kakudoEl.oninput = recalc;
+  recalc();
 }
 
 // ===== INIT =====

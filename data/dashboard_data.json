@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-04-18 12:10:02",
+  "generated_at": "2026-04-25 13:06:47",
   "kpi": {
     "avg_profit": 1000000.0,
-    "q_progress": 0.18681318681318682,
+    "q_progress": 0.26373626373626374,
     "ca_names": [
       "辰巳",
       "黒川",
@@ -19636,6 +19636,17 @@
   "insights": {
     "overall": [
       {
+        "type": "critical",
+        "title": "売上進捗が日程進捗を大幅に下回っています",
+        "detail": "日程進捗26.4%に対し売上達成率17.1%（差分9.2pp）。現ペースでは目標未達の可能性が高い。",
+        "metrics": {
+          "日程進捗": "26.4%",
+          "売上達成率": "17.1%",
+          "差分": "9.2pp"
+        },
+        "action": "ヨミ案件の精査、決定見込み案件の早期クロージング、高単価案件への集中を検討"
+      },
+      {
         "type": "warning",
         "title": "面談数は充足しているが決定率が低い",
         "detail": "面談836.0件（目標600件の139%）に対し決定32.0件（決定率3.8%）。面談の質・マッチング精度に課題あり。",
@@ -19801,8 +19812,8 @@
           },
           {
             "area": "売上達成",
-            "detail": "達成率10.7%で遅れ",
-            "severity": "medium"
+            "detail": "達成率10.7%で大幅未達",
+            "severity": "high"
           }
         ],
         "strengths": [],
@@ -19814,9 +19825,10 @@
         },
         "actions": [
           "スカウト活動の強化・アサイン数の増加が急務",
-          "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）"
+          "面談品質の改善（ヒアリング力向上、求人マッチング精度改善）",
+          "高単価案件への集中、決定促進アクション"
         ],
-        "status": "warning"
+        "status": "critical"
       },
       "嘉重": {
         "summary": {
@@ -19837,11 +19849,15 @@
             "area": "面談数",
             "detail": "目標75件に対し19件（25%）で大幅不足",
             "severity": "high"
+          },
+          {
+            "area": "売上達成",
+            "detail": "達成率16.5%で遅れ",
+            "severity": "medium"
           }
         ],
         "strengths": [
-          "決定率5.3%で良好",
-          "売上達成率16.5%で順調"
+          "決定率5.3%で良好"
         ],
         "monthly_trend": {
           "last_month": "2026年4月",
@@ -19873,11 +19889,15 @@
             "area": "面談数",
             "detail": "目標75件に対し22件（29%）で大幅不足",
             "severity": "high"
+          },
+          {
+            "area": "売上達成",
+            "detail": "達成率18.1%で遅れ",
+            "severity": "medium"
           }
         ],
         "strengths": [
-          "決定率4.5%で良好",
-          "売上達成率18.1%で順調"
+          "決定率4.5%で良好"
         ],
         "monthly_trend": {
           "last_month": "2026年4月",
@@ -20275,40 +20295,40 @@
     ]
   },
   "weekly_pulse": {
-    "generated_at": "2026-04-18 12:10",
-    "month_progress": 0.6,
+    "generated_at": "2026-04-25 13:06",
+    "month_progress": 0.83,
     "current_month": "2026-04",
     "prev_month": "2026-03",
     "overall": {
       "アサイン": {
         "current": 206,
         "prev": 353,
-        "projected": 343,
-        "pace": -0.028
+        "projected": 247,
+        "pace": -0.3
       },
       "初回面談": {
         "current": 124,
         "prev": 249,
-        "projected": 207,
-        "pace": -0.169
+        "projected": 149,
+        "pace": -0.402
       },
       "求人紹介": {
         "current": 33,
         "prev": 133,
-        "projected": 55,
-        "pace": -0.586
+        "projected": 40,
+        "pace": -0.699
       },
       "応募": {
         "current": 16,
         "prev": 69,
-        "projected": 27,
-        "pace": -0.609
+        "projected": 19,
+        "pace": -0.725
       },
       "1st面接": {
         "current": 10,
         "prev": 43,
-        "projected": 17,
-        "pace": -0.605
+        "projected": 12,
+        "pace": -0.721
       },
       "2nd面接": {
         "current": 0,
@@ -20341,14 +20361,14 @@
           "アサイン": {
             "current": 5,
             "prev": 21,
-            "projected": 8,
-            "pace": -0.619
+            "projected": 6,
+            "pace": -0.714
           },
           "初回面談": {
             "current": 2,
             "prev": 14,
-            "projected": 3,
-            "pace": -0.786
+            "projected": 2,
+            "pace": -0.857
           },
           "求人紹介": {
             "current": 0,
@@ -20396,7 +20416,7 @@
         "alerts": [
           {
             "type": "warning",
-            "message": "面談ペース低下: 着地3件予測（前月14件）"
+            "message": "面談ペース低下: 着地2件予測（前月14件）"
           },
           {
             "type": "info",
@@ -20526,32 +20546,32 @@
           "アサイン": {
             "current": 38,
             "prev": 62,
-            "projected": 63,
-            "pace": 0.016
+            "projected": 46,
+            "pace": -0.258
           },
           "初回面談": {
             "current": 19,
             "prev": 44,
-            "projected": 32,
-            "pace": -0.273
+            "projected": 23,
+            "pace": -0.477
           },
           "求人紹介": {
             "current": 5,
             "prev": 16,
-            "projected": 8,
-            "pace": -0.5
+            "projected": 6,
+            "pace": -0.625
           },
           "応募": {
             "current": 4,
             "prev": 9,
-            "projected": 7,
-            "pace": -0.222
+            "projected": 5,
+            "pace": -0.444
           },
           "1st面接": {
             "current": 4,
             "prev": 7,
-            "projected": 7,
-            "pace": 0.0
+            "projected": 5,
+            "pace": -0.286
           },
           "2nd面接": {
             "current": 0,
@@ -20579,6 +20599,10 @@
           }
         },
         "alerts": [
+          {
+            "type": "warning",
+            "message": "面談ペース低下: 着地23件予測（前月44件）"
+          },
           {
             "type": "info",
             "message": "ホット案件: 内定1 最終4"
@@ -20710,32 +20734,32 @@
           "アサイン": {
             "current": 46,
             "prev": 53,
-            "projected": 77,
-            "pace": 0.453
+            "projected": 55,
+            "pace": 0.038
           },
           "初回面談": {
             "current": 28,
             "prev": 37,
-            "projected": 47,
-            "pace": 0.27
+            "projected": 34,
+            "pace": -0.081
           },
           "求人紹介": {
             "current": 6,
             "prev": 16,
-            "projected": 10,
-            "pace": -0.375
+            "projected": 7,
+            "pace": -0.562
           },
           "応募": {
             "current": 2,
             "prev": 9,
-            "projected": 3,
-            "pace": -0.667
+            "projected": 2,
+            "pace": -0.778
           },
           "1st面接": {
             "current": 1,
             "prev": 5,
-            "projected": 2,
-            "pace": -0.6
+            "projected": 1,
+            "pace": -0.8
           },
           "2nd面接": {
             "current": 0,
@@ -20763,10 +20787,6 @@
           }
         },
         "alerts": [
-          {
-            "type": "good",
-            "message": "面談ペース好調: 着地47件予測（前月37件）"
-          },
           {
             "type": "info",
             "message": "ホット案件: 内定1 最終1"
@@ -20896,32 +20916,32 @@
           "アサイン": {
             "current": 27,
             "prev": 42,
-            "projected": 45,
-            "pace": 0.071
+            "projected": 32,
+            "pace": -0.238
           },
           "初回面談": {
             "current": 19,
             "prev": 30,
-            "projected": 32,
-            "pace": 0.067
+            "projected": 23,
+            "pace": -0.233
           },
           "求人紹介": {
             "current": 8,
             "prev": 23,
-            "projected": 13,
-            "pace": -0.435
+            "projected": 10,
+            "pace": -0.565
           },
           "応募": {
             "current": 3,
             "prev": 12,
-            "projected": 5,
-            "pace": -0.583
+            "projected": 4,
+            "pace": -0.667
           },
           "1st面接": {
             "current": 2,
             "prev": 8,
-            "projected": 3,
-            "pace": -0.625
+            "projected": 2,
+            "pace": -0.75
           },
           "2nd面接": {
             "current": 0,
@@ -21083,32 +21103,32 @@
           "アサイン": {
             "current": 40,
             "prev": 58,
-            "projected": 67,
-            "pace": 0.155
+            "projected": 48,
+            "pace": -0.172
           },
           "初回面談": {
             "current": 22,
             "prev": 38,
-            "projected": 37,
-            "pace": -0.026
+            "projected": 26,
+            "pace": -0.316
           },
           "求人紹介": {
             "current": 4,
             "prev": 15,
-            "projected": 7,
-            "pace": -0.533
+            "projected": 5,
+            "pace": -0.667
           },
           "応募": {
             "current": 3,
             "prev": 5,
-            "projected": 5,
-            "pace": 0.0
+            "projected": 4,
+            "pace": -0.2
           },
           "1st面接": {
             "current": 2,
             "prev": 4,
-            "projected": 3,
-            "pace": -0.25
+            "projected": 2,
+            "pace": -0.5
           },
           "2nd面接": {
             "current": 0,
@@ -21136,6 +21156,10 @@
           }
         },
         "alerts": [
+          {
+            "type": "warning",
+            "message": "面談ペース低下: 着地26件予測（前月38件）"
+          },
           {
             "type": "info",
             "message": "ホット案件: 内定2 最終2"
@@ -21272,20 +21296,20 @@
           "アサイン": {
             "current": 25,
             "prev": 44,
-            "projected": 42,
-            "pace": -0.045
+            "projected": 30,
+            "pace": -0.318
           },
           "初回面談": {
             "current": 19,
             "prev": 34,
-            "projected": 32,
-            "pace": -0.059
+            "projected": 23,
+            "pace": -0.324
           },
           "求人紹介": {
             "current": 5,
             "prev": 20,
-            "projected": 8,
-            "pace": -0.6
+            "projected": 6,
+            "pace": -0.7
           },
           "応募": {
             "current": 0,
@@ -21325,6 +21349,10 @@
           }
         },
         "alerts": [
+          {
+            "type": "warning",
+            "message": "面談ペース低下: 着地23件予測（前月34件）"
+          },
           {
             "type": "info",
             "message": "ホット案件: 内定0 最終1"
@@ -21561,6 +21589,12 @@
       }
     },
     "alerts": [
+      {
+        "type": "warning",
+        "area": "初回面談",
+        "message": "初回面談ペースが前月比-40%。月末着地149件予測（前月249件）",
+        "severity": "high"
+      },
       {
         "type": "warning",
         "area": "初回面談→求人紹介",
@@ -29053,7 +29087,7 @@
     }
   },
   "yomi_forecast": {
-    "generated_at": "2026-04-18 12:09",
+    "generated_at": "2026-04-25 13:06",
     "quarter": "FY26/2Q",
     "q_months": [
       {
@@ -30336,6 +30370,345 @@
       }
     },
     "total_candidates": 61
+  },
+  "weekly_report": {
+    "generated_at": "2026-04-25 13:06",
+    "quarter": "FY26/2Q",
+    "q_target": 44800000.0,
+    "q_actual": 7671565.0,
+    "q_landing_db": 30776320.0,
+    "days_remaining": 65,
+    "q_progress": 0.27472527472527475,
+    "pipeline_forecast": 30776319,
+    "new_revenue_predicted": 12518721,
+    "integrated_forecast": 43295040,
+    "gap": 1504960,
+    "achievement_rate": 0.9664071373769856,
+    "forecast_logic": {
+      "daily_interview_pace": 9.29,
+      "decision_rate": 0.027624309392265192,
+      "avg_profit_per_decision": 1084157,
+      "recent_interview_total": 836,
+      "recent_months": [
+        "2026-03",
+        "2026-02",
+        "2026-01"
+      ],
+      "effective_days": 45,
+      "new_interviews_predicted": 418,
+      "new_decisions_predicted": 11.5
+    },
+    "needed_interviews": 50,
+    "needed_decisions": 1.4,
+    "needed_daily_pace": 1.12,
+    "pace_gap": -8.17,
+    "hot_pipeline": 19480569,
+    "hot_count": 24,
+    "kakudo_up_targets": [
+      {
+        "ca": "嘉重",
+        "name": "波岡 成実",
+        "kakudo": 60,
+        "status": "最終面接",
+        "arari": 2639000.0,
+        "kitai_arari": 1583400
+      },
+      {
+        "ca": "富田",
+        "name": "髙久 椋",
+        "kakudo": 60,
+        "status": "最終面接",
+        "arari": 1800000.0,
+        "kitai_arari": 1080000
+      },
+      {
+        "ca": "辰巳",
+        "name": "本山 拓海",
+        "kakudo": 40,
+        "status": "最終面接",
+        "arari": 1500000.0,
+        "kitai_arari": 600000
+      },
+      {
+        "ca": "黒川",
+        "name": "富川 あかね",
+        "kakudo": 60,
+        "status": "最終面接",
+        "arari": 1500000.0,
+        "kitai_arari": 900000
+      },
+      {
+        "ca": "百石",
+        "name": "茨 陸翔",
+        "kakudo": 40,
+        "status": "最終面接",
+        "arari": 1350000.0,
+        "kitai_arari": 540000
+      },
+      {
+        "ca": "古谷",
+        "name": "守谷 優希",
+        "kakudo": 50,
+        "status": "1st面接",
+        "arari": 1225000.0,
+        "kitai_arari": 612500
+      },
+      {
+        "ca": "黒川",
+        "name": "久保 慎太郎",
+        "kakudo": 50,
+        "status": "最終面接",
+        "arari": 1225000.0,
+        "kitai_arari": 612500
+      },
+      {
+        "ca": "嘉重",
+        "name": "田中 翔士",
+        "kakudo": 40,
+        "status": "最終面接",
+        "arari": 1218000.0,
+        "kitai_arari": 487200
+      },
+      {
+        "ca": "嘉重",
+        "name": "原 健斗",
+        "kakudo": 50,
+        "status": "1st面接",
+        "arari": 1200000.0,
+        "kitai_arari": 600000
+      },
+      {
+        "ca": "富田",
+        "name": "中野 亜美2",
+        "kakudo": 40,
+        "status": "1st面接",
+        "arari": 1200000.0,
+        "kitai_arari": 480000
+      }
+    ],
+    "weekly_change": {},
+    "trend_data": [
+      {
+        "date": "2026-04-25",
+        "forecast": 43295039.75448895,
+        "pipeline": 30776319,
+        "hot": 19480569,
+        "achievement": 0.9664071373769856
+      }
+    ],
+    "ca_weekly_change": {},
+    "by_ca": {
+      "辰巳": {
+        "q_target": 3500000,
+        "pipeline_forecast": 1050000,
+        "new_revenue_predicted": 585445,
+        "integrated_forecast": 1635445,
+        "gap": 1864555,
+        "achievement_rate": 0.46726996125,
+        "daily_interview_pace": 0.6,
+        "decision_rate": 0.02,
+        "recent_interviews": 54,
+        "needed_interviews": 86,
+        "needed_decisions": 1.7,
+        "q_count": 2,
+        "q_high_zone": 0
+      },
+      "黒川": {
+        "q_target": 8000000,
+        "pipeline_forecast": 7753000,
+        "new_revenue_predicted": 3495972,
+        "integrated_forecast": 11248972,
+        "gap": -3248972,
+        "achievement_rate": 1.4061215008146726,
+        "daily_interview_pace": 1.488888888888889,
+        "decision_rate": 0.0481283422459893,
+        "recent_interviews": 134,
+        "needed_interviews": 0,
+        "needed_decisions": 0,
+        "q_count": 14,
+        "q_high_zone": 5060500
+      },
+      "古谷": {
+        "q_target": 7000000,
+        "pipeline_forecast": 4535139,
+        "new_revenue_predicted": 1512260,
+        "integrated_forecast": 6047399,
+        "gap": 952601,
+        "achievement_rate": 0.8639141769230769,
+        "daily_interview_pace": 1.511111111111111,
+        "decision_rate": 0.020512820512820513,
+        "recent_interviews": 136,
+        "needed_interviews": 43,
+        "needed_decisions": 0.9,
+        "q_count": 9,
+        "q_high_zone": 2906589
+      },
+      "嘉重": {
+        "q_target": 8000000,
+        "pipeline_forecast": 6373160,
+        "new_revenue_predicted": 2335108,
+        "integrated_forecast": 8708268,
+        "gap": -708268,
+        "achievement_rate": 1.0885334651442307,
+        "daily_interview_pace": 0.9777777777777777,
+        "decision_rate": 0.04895104895104895,
+        "recent_interviews": 88,
+        "needed_interviews": 0,
+        "needed_decisions": 0,
+        "q_count": 11,
+        "q_high_zone": 3922460
+      },
+      "百石": {
+        "q_target": 7000000,
+        "pipeline_forecast": 4530300,
+        "new_revenue_predicted": 2460822,
+        "integrated_forecast": 6991122,
+        "gap": 8878,
+        "achievement_rate": 0.9987317228717292,
+        "daily_interview_pace": 1.4555555555555555,
+        "decision_rate": 0.034653465346534656,
+        "recent_interviews": 131,
+        "needed_interviews": 0,
+        "needed_decisions": 0.0,
+        "q_count": 7,
+        "q_high_zone": 3706800
+      },
+      "石丸": {
+        "q_target": 3500000,
+        "pipeline_forecast": 2170500,
+        "new_revenue_predicted": 1068669,
+        "integrated_forecast": 3239169,
+        "gap": 260831,
+        "achievement_rate": 0.9254769133928571,
+        "daily_interview_pace": 0.7666666666666667,
+        "decision_rate": 0.02857142857142857,
+        "recent_interviews": 69,
+        "needed_interviews": 8,
+        "needed_decisions": 0.2,
+        "q_count": 8,
+        "q_high_zone": 0
+      },
+      "肥後": {
+        "q_target": 800000,
+        "pipeline_forecast": 0,
+        "new_revenue_predicted": 0,
+        "integrated_forecast": 0,
+        "gap": 800000,
+        "achievement_rate": 0.0,
+        "daily_interview_pace": 0,
+        "decision_rate": 0.027624309392265192,
+        "recent_interviews": 0,
+        "needed_interviews": 27,
+        "needed_decisions": 0.7,
+        "q_count": 1,
+        "q_high_zone": 0
+      }
+    },
+    "ca_suggestions": {
+      "辰巳": [
+        {
+          "type": "gap",
+          "message": "Gap ▲186万 → 追加1.7件決定 / 86件面談必要"
+        },
+        {
+          "type": "pace",
+          "message": "面談ペース0.60件/日 (チーム平均1.33件/日) → ペースUP必要"
+        }
+      ],
+      "黒川": [],
+      "古谷": [
+        {
+          "type": "gap",
+          "message": "Gap ▲95万 → 追加0.9件決定 / 43件面談必要"
+        }
+      ],
+      "嘉重": [],
+      "百石": [
+        {
+          "type": "gap",
+          "message": "Gap ▲1万 → 追加0.0件決定 / 0件面談必要"
+        }
+      ],
+      "石丸": [
+        {
+          "type": "gap",
+          "message": "Gap ▲26万 → 追加0.2件決定 / 8件面談必要"
+        },
+        {
+          "type": "pace",
+          "message": "面談ペース0.77件/日 (チーム平均1.33件/日) → ペースUP必要"
+        }
+      ],
+      "肥後": [
+        {
+          "type": "gap",
+          "message": "Gap ▲80万 → 追加0.7件決定 / 27件面談必要"
+        },
+        {
+          "type": "pace",
+          "message": "面談ペース0.00件/日 (チーム平均1.33件/日) → ペースUP必要"
+        }
+      ]
+    },
+    "suggestions": [
+      {
+        "type": "gap",
+        "priority": "high",
+        "message": "Gap ▲150万円を埋めるには、追加で1.4件の決定（50件の新規面談）が必要"
+      },
+      {
+        "type": "hot",
+        "priority": "medium",
+        "message": "ホット案件（50%以上）24名・1948万円 → クロージング集中"
+      },
+      {
+        "type": "kakudo_up",
+        "priority": "high",
+        "message": "確度UP候補（40-60%帯）25名 → 上位5名のフェーズアップに注力",
+        "targets": [
+          {
+            "ca": "嘉重",
+            "name": "波岡 成実",
+            "kakudo": 60,
+            "status": "最終面接",
+            "arari": 2639000.0,
+            "kitai_arari": 1583400
+          },
+          {
+            "ca": "富田",
+            "name": "髙久 椋",
+            "kakudo": 60,
+            "status": "最終面接",
+            "arari": 1800000.0,
+            "kitai_arari": 1080000
+          },
+          {
+            "ca": "辰巳",
+            "name": "本山 拓海",
+            "kakudo": 40,
+            "status": "最終面接",
+            "arari": 1500000.0,
+            "kitai_arari": 600000
+          },
+          {
+            "ca": "黒川",
+            "name": "富川 あかね",
+            "kakudo": 60,
+            "status": "最終面接",
+            "arari": 1500000.0,
+            "kitai_arari": 900000
+          },
+          {
+            "ca": "百石",
+            "name": "茨 陸翔",
+            "kakudo": 40,
+            "status": "最終面接",
+            "arari": 1350000.0,
+            "kitai_arari": 540000
+          }
+        ]
+      }
+    ]
   },
   "lead_time_months": [
     "2026年4月",
