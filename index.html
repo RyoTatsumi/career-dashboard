@@ -163,6 +163,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;min-
   <button class="tab-btn" data-tab="inflow" onclick="showTab('inflow')">流入属性分析</button>
   <button class="tab-btn" data-tab="route" onclick="showTab('route')">経路別分析</button>
   <button class="tab-btn" data-tab="referral" onclick="showTab('referral')">リファラル</button>
+  <button class="tab-btn" data-tab="yomi" onclick="showTab('yomi')">ヨミ予測</button>
 </nav>
 
 <!-- Period Selector (hidden - auto-selected) -->
@@ -364,6 +365,33 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;min-
     </div>
   </div>
 
+  <!-- TAB: ヨミ予測 -->
+  <div id="tab-yomi" class="tab-content">
+    <div class="grid-3" id="yomi-kpis"></div>
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title">月別着地予測（会社全体）</div>
+      <div class="chart-wrap-lg"><canvas id="chartYomiMonthly"></canvas></div>
+    </div>
+    <div class="grid-2" style="margin-top:20px;">
+      <div class="card">
+        <div class="card-title">50%以上ゾーン vs 30%帯（月別）</div>
+        <div class="chart-wrap-lg"><canvas id="chartYomiZones"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">CA別 Q着地予測</div>
+        <div class="chart-wrap-lg"><canvas id="chartYomiCA"></canvas></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title">CA別 月次着地予測 詳細</div>
+      <div id="yomi-ca-details" style="overflow-x:auto;"></div>
+    </div>
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title">パイプライン詳細（確度30%以上）</div>
+      <div id="yomi-pipeline-table" style="overflow-x:auto;"></div>
+    </div>
+  </div>
+
 </main>
 
 <!-- CA Detail Modal -->
@@ -383,7 +411,7 @@ let DATA = null;
 const chartInstances = {};
 const CA_COLORS = {
   '辰巳':'#3b82f6','黒川':'#10b981','渡辺':'#94a3b8','古谷':'#f59e0b',
-  '嘉重':'#8b5cf6','百石':'#ef4444','百瀬':'#9ca3af','石丸':'#06b6d4'
+  '嘉重':'#8b5cf6','百石':'#ef4444','百瀬':'#9ca3af','石丸':'#06b6d4','肥後':'#ec4899'
 };
 
 // ===== PERIOD STATE =====
@@ -585,6 +613,7 @@ function renderAll(){
   renderInflow();
   renderRoute();
   renderReferral();
+  renderYomi();
 }
 
 // ===== TAB: 概要 =====
@@ -3006,6 +3035,234 @@ function _renderCADetail(caName, periodMode){
       plugins:[ChartDataLabels]
     });
   }, 50);
+}
+
+// ===== TAB: ヨミ予測 =====
+function renderYomi(){
+  const yomi = DATA.yomi_forecast;
+  if(!yomi) return;
+
+  const co = yomi.company;
+  const qTarget = yomi.q_target;
+  const qTotal = co.q_total;
+  const qGap = co.q_gap;
+  const achRate = co.q_achievement_rate;
+  const departed = DATA.ca_status?.departed || [];
+
+  // --- KPI Cards ---
+  const gapClass = qGap >= 0 ? 'kpi-up' : 'kpi-down';
+  const gapSign = qGap >= 0 ? '+' : '▲';
+  const gapAbs = Math.abs(qGap);
+
+  document.getElementById('yomi-kpis').innerHTML = `
+    <div class="card card-sm">
+      <div class="kpi-label">${yomi.quarter} 売上目標</div>
+      <div class="kpi-value">${fmtMoney(qTarget)}</div>
+      <div class="kpi-sub kpi-neutral">粗利ベース</div>
+    </div>
+    <div class="card card-sm">
+      <div class="kpi-label">着地見込（ヨミ予測）</div>
+      <div class="kpi-value">${fmtMoney(qTotal)}</div>
+      <div class="kpi-sub ${gapClass}">Gap: ${gapSign}${fmtMoney(gapAbs)}</div>
+    </div>
+    <div class="card card-sm">
+      <div class="kpi-label">予測達成率</div>
+      <div class="kpi-value">${achRate}%</div>
+      <div class="kpi-sub ${achRate >= 100 ? 'kpi-up' : achRate >= 80 ? 'kpi-neutral' : 'kpi-down'}">${achRate >= 100 ? '達成見込み' : achRate >= 80 ? '要追い込み' : 'Gap埋め必要'}</div>
+    </div>
+  `;
+
+  // --- Monthly bar chart (company-wide) ---
+  const mLabels = [0,1,2].map(i => co.monthly[i].label);
+  const mTotals = [0,1,2].map(i => co.monthly[i].total / 10000);
+  const mTargets = [0,1,2].map(i => (co.monthly[i].target || yomi.monthly_target) / 10000);
+  const mHigh = [0,1,2].map(i => co.monthly[i].high_zone_total / 10000);
+  const mLow = [0,1,2].map(i => co.monthly[i].low_zone_total / 10000);
+
+  const monthColors = ['#3b82f6','#8b5cf6','#a78bfa'];
+
+  makeChart('chartYomiMonthly', {
+    type: 'bar',
+    data: {
+      labels: mLabels,
+      datasets: [
+        {label:'50%以上', data:mHigh, backgroundColor:'#3b82f6', borderRadius:4, stack:'a'},
+        {label:'30%帯', data:mLow, backgroundColor:'#93c5fd', borderRadius:4, stack:'a'},
+        {label:'目標', data:mTargets, type:'line', borderColor:'#ef4444', borderDash:[5,5], pointRadius:4, borderWidth:2, datalabels:{display:false}, fill:false}
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: {
+        legend:{position:'top',labels:{font:{size:11}}},
+        datalabels:{
+          anchor:'end', align:'end', font:{size:11,weight:600}, color:'#334155',
+          formatter:(v,ctx) => {
+            if(ctx.datasetIndex === 2) return '';
+            if(ctx.datasetIndex === 1) return Math.round(mHigh[ctx.dataIndex]+mLow[ctx.dataIndex])+'万';
+            return '';
+          }
+        }
+      },
+      scales: {
+        y:{grid:{color:'#f1f5f9'},ticks:{callback:v=>v+'万'}},
+        x:{grid:{display:false},stacked:true}
+      }
+    },
+    plugins:[ChartDataLabels]
+  });
+
+  // --- Zones chart (high vs low by month) ---
+  makeChart('chartYomiZones', {
+    type: 'bar',
+    data: {
+      labels: mLabels,
+      datasets: [
+        {label:'50%以上（堅い見込み）', data:mHigh, backgroundColor:'#10b981', borderRadius:4},
+        {label:'30-40%帯（育てる見込み）', data:mLow, backgroundColor:'#fbbf24', borderRadius:4}
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: {
+        legend:{position:'top',labels:{font:{size:11}}},
+        datalabels:{anchor:'end',align:'end',font:{size:10,weight:600},color:'#334155',formatter:v=>v?Math.round(v)+'万':''}
+      },
+      scales: {
+        y:{grid:{color:'#f1f5f9'},ticks:{callback:v=>v+'万'}},
+        x:{grid:{display:false}}
+      }
+    },
+    plugins:[ChartDataLabels]
+  });
+
+  // --- CA bar chart ---
+  const caKeys = Object.keys(yomi.by_ca).filter(c=>!departed.includes(c)).sort((a,b)=>(yomi.by_ca[b].q_total||0)-(yomi.by_ca[a].q_total||0));
+  const caLabels = caKeys;
+  const caQTotals = caKeys.map(c=>yomi.by_ca[c].q_total/10000);
+  const caQTargets = caKeys.map(c=>(yomi.by_ca[c].q_target||0)/10000);
+  const caQHigh = caKeys.map(c=>yomi.by_ca[c].q_high_zone/10000);
+  const caQLow = caKeys.map(c=>yomi.by_ca[c].q_low_zone/10000);
+
+  makeChart('chartYomiCA', {
+    type: 'bar',
+    data: {
+      labels: caLabels,
+      datasets: [
+        {label:'50%以上', data:caQHigh, backgroundColor:'#3b82f6', borderRadius:4, stack:'a'},
+        {label:'30%帯', data:caQLow, backgroundColor:'#93c5fd', borderRadius:4, stack:'a'},
+        {label:'目標', data:caQTargets, type:'line', borderColor:'#ef4444', borderDash:[5,5], pointRadius:3, borderWidth:2, datalabels:{display:false}, fill:false}
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: {
+        legend:{position:'top',labels:{font:{size:11}}},
+        datalabels:{
+          anchor:'end',align:'end',font:{size:9,weight:600},color:'#334155',
+          formatter:(v,ctx)=>{
+            if(ctx.datasetIndex===1) return Math.round(caQHigh[ctx.dataIndex]+caQLow[ctx.dataIndex])+'万';
+            return '';
+          }
+        }
+      },
+      scales: {
+        y:{grid:{color:'#f1f5f9'},ticks:{callback:v=>v+'万'}},
+        x:{grid:{display:false},stacked:true}
+      }
+    },
+    plugins:[ChartDataLabels]
+  });
+
+  // --- CA Detail Table ---
+  const activeCAs = (DATA.kpi?.ca_names||[]).filter(c=>!departed.includes(c) && yomi.by_ca[c]);
+  let detailHtml = '<table class="data-table"><thead><tr>';
+  detailHtml += '<th>CA</th><th class="num">Q目標</th><th class="num">Q着地</th><th class="num">Gap</th>';
+  [0,1,2].forEach(i => {
+    const lbl = yomi.q_months[i]?.label || (i+'月');
+    detailHtml += `<th class="num" style="background:${i===0?'#eff6ff':i===1?'#f5f3ff':'#fefce8'}">${lbl}着地</th>`;
+  });
+  detailHtml += '<th class="num">確度UP候補</th></tr></thead><tbody>';
+
+  activeCAs.sort((a,b)=>(yomi.by_ca[b]?.q_total||0)-(yomi.by_ca[a]?.q_total||0));
+  activeCAs.forEach(ca => {
+    const d = yomi.by_ca[ca];
+    if(!d) return;
+    const gap = (d.q_total||0) - (d.q_target||0);
+    const gapCls = gap >= 0 ? 'color:#10b981' : 'color:#ef4444';
+    const gapStr = gap >= 0 ? '+'+fmtMoney(gap) : '▲'+fmtMoney(Math.abs(gap));
+    detailHtml += `<tr>
+      <td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${CA_COLORS[ca]||'#64748b'};margin-right:6px;"></span>${ca}</td>
+      <td class="num">${fmtMoney(d.q_target||0)}</td>
+      <td class="num" style="font-weight:600;">${fmtMoney(d.q_total)}</td>
+      <td class="num" style="${gapCls};font-weight:600;">${gapStr}</td>`;
+    [0,1,2].forEach(i => {
+      const m = d.monthly[i];
+      const bg = i===0?'#eff6ff':i===1?'#f5f3ff':'#fefce8';
+      detailHtml += `<td class="num" style="background:${bg}">${fmtMoney(m?.total||0)}<br><span style="font-size:10px;color:#94a3b8">${m?.count||0}名</span></td>`;
+    });
+    const upCands = (d.kakudo_up_candidates||[]).length;
+    detailHtml += `<td class="num">${upCands}名</td></tr>`;
+  });
+  detailHtml += '</tbody></table>';
+  document.getElementById('yomi-ca-details').innerHTML = detailHtml;
+
+  // --- Pipeline Detail Table (per CA, expandable) ---
+  let pipeHtml = '';
+  activeCAs.forEach(ca => {
+    const d = yomi.by_ca[ca];
+    if(!d) return;
+    const gap = (d.q_total||0) - (d.q_target||0);
+    const gapStr = gap >= 0 ? `<span style="color:#10b981">+${fmtMoney(gap)}</span>` : `<span style="color:#ef4444">▲${fmtMoney(Math.abs(gap))}</span>`;
+
+    pipeHtml += `<div style="margin-bottom:16px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">`;
+    pipeHtml += `<div style="padding:12px 16px;background:#f8fafc;display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">`;
+    pipeHtml += `<div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${CA_COLORS[ca]||'#64748b'};margin-right:8px;"></span><strong>${ca}</strong>`;
+    pipeHtml += ` <span style="color:#64748b;font-size:13px;">Q目標 ${fmtMoney(d.q_target||0)} / 着地 ${fmtMoney(d.q_total)} / Gap ${gapStr}</span></div>`;
+    pipeHtml += `<span style="color:#94a3b8;font-size:18px;">▼</span></div>`;
+    pipeHtml += `<div style="display:none;padding:0 16px 16px;">`;
+
+    [0,1,2].forEach(i => {
+      const m = d.monthly[i];
+      if(!m || m.count === 0) return;
+      const mLabel = yomi.q_months[i]?.label || m.label;
+      const isCurrentMonth = (i === yomi.current_month_idx);
+      const colors = ['🔵','🟣','🟤'];
+      pipeHtml += `<div style="margin-top:12px;">`;
+      pipeHtml += `<div style="font-weight:600;font-size:14px;color:#334155;margin-bottom:6px;">${colors[i]} ${isCurrentMonth?'当月':''}（${mLabel}）着地 ${m.count}名 | ${fmtMoney(m.total)}</div>`;
+
+      // Candidate list
+      if(m.candidates && m.candidates.length > 0) {
+        pipeHtml += '<div style="margin-left:16px;">';
+        m.candidates.forEach(c => {
+          const kakudoColor = c.kakudo >= 80 ? '#10b981' : c.kakudo >= 50 ? '#3b82f6' : c.kakudo >= 40 ? '#f59e0b' : '#94a3b8';
+          pipeHtml += `<div style="padding:4px 0;font-size:13px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f1f5f9;">`;
+          pipeHtml += `<span style="display:inline-block;min-width:36px;text-align:center;padding:2px 6px;border-radius:4px;background:${kakudoColor};color:white;font-size:11px;font-weight:600;">${c.kakudo}%</span>`;
+          pipeHtml += `<span style="min-width:80px;font-weight:500;">${c.name}</span>`;
+          pipeHtml += `<span style="color:#64748b;font-size:12px;">${c.status}</span>`;
+          pipeHtml += `<span style="margin-left:auto;color:#334155;">粗利${fmtMoney(c.arari)} → 期待値<strong>${fmtMoney(c.kitai_arari)}</strong></span>`;
+          pipeHtml += `</div>`;
+        });
+        pipeHtml += '</div>';
+      }
+      pipeHtml += '</div>';
+    });
+
+    // Kakudo-up candidates
+    const upCands = d.kakudo_up_candidates || [];
+    if(upCands.length > 0) {
+      pipeHtml += `<div style="margin-top:16px;padding:12px;background:#fffbeb;border-radius:8px;">`;
+      pipeHtml += `<div style="font-weight:600;font-size:13px;color:#92400e;margin-bottom:6px;">🚀 確度UP候補（40-60%）</div>`;
+      upCands.forEach(c => {
+        pipeHtml += `<div style="font-size:12px;color:#78350f;padding:2px 0;">${c.name}（${c.kakudo}%・${c.status}）</div>`;
+      });
+      pipeHtml += '</div>';
+    }
+
+    pipeHtml += '</div></div>';
+  });
+
+  document.getElementById('yomi-pipeline-table').innerHTML = pipeHtml;
 }
 
 // ===== INIT =====

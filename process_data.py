@@ -107,6 +107,15 @@ def extract_sales_by_ca(wb):
         if row[0] and row[1] and '目標' in str(row[1]):
             ca_starts.append({'row': i, 'name': str(row[0])})
 
+    # Normalize metric names: map new spreadsheet names to legacy names
+    # so downstream code doesn't need to change
+    metric_aliases = {
+        '目標(CA粗利)': '目標(粗利)',
+        '実績(CA粗利)': '実績(粗利)',
+        '着地(CA粗利)': '着地見込み',
+        '実績(RA粗利)': '実績(RA粗利)',
+    }
+
     result = {}
     for ca_info in ca_starts:
         ca_name = ca_info['name']
@@ -116,6 +125,8 @@ def extract_sales_by_ca(wb):
         for offset in range(min(13, len(all_rows) - ca_row)):
             row = all_rows[ca_row + offset]
             metric = str(row[1]) if row[1] else ''
+            # Normalize metric name
+            metric = metric_aliases.get(metric, metric)
             for m in months:
                 period = m['label']
                 col = m['col']
@@ -506,6 +517,337 @@ def extract_route_breakdown(wb):
         'routes': sorted(set(r for c in route_quarterly.values() for r in c.keys())),
         'decision_rates': {r: {q: v for q, v in qs.items()} for r, qs in route_decision_rates.items()},
     }
+
+def extract_yomi_forecast(wb):
+    """Extract ヨミ予測 (pipeline forecast) from DB_求職者一覧.
+
+    New logic (2026/4Q~):
+    - 確度 30%以上を計算対象
+    - 期待値 = 粗利 × 確度%
+    - 月別着地予測（当月/来月/翌々月）
+    - 50%以上ゾーン vs 30%ゾーンを分けて集計
+    - 「決定」ステータスは確度100%として扱う
+    """
+    ws = wb['DB_求職者一覧']
+    today = datetime.now()
+    current_fy = today.year
+    current_q = (today.month - 1) // 3 + 1
+    q_start_month = (current_q - 1) * 3 + 1
+    q_end_month = current_q * 3
+
+    # Current Q month range
+    q_months = []
+    for m in range(q_start_month, q_end_month + 1):
+        q_months.append((current_fy, m))
+
+    # Month labels
+    month_labels = {}
+    for i, (y, m) in enumerate(q_months):
+        if i == 0:
+            label = '当月' if today.month == m else f'{m}月'
+        month_labels[(y, m)] = f'{m}月'
+
+    # Determine which month index is "current"
+    current_month_idx = today.month - q_start_month  # 0, 1, or 2
+
+    departed_cas = ['渡辺', '百瀬']
+
+    # Q start date for filtering
+    q_start_date = datetime(current_fy, q_start_month, 1)
+
+    def parse_date_ym(raw):
+        """Parse a date value and return (year, month) or (None, None)."""
+        if not raw:
+            return None, None
+        if isinstance(raw, (datetime, date)):
+            return raw.year, raw.month
+        dt_match = re.match(r'(\d{4})-(\d{2})', str(raw))
+        if dt_match:
+            return int(dt_match.group(1)), int(dt_match.group(2))
+        return None, None
+
+    # Collect all active pipeline candidates with 確度 >= 30%
+    candidates = []
+    for r in range(3, ws.max_row + 1):
+        name = ws.cell(r, 1).value
+        status = str(ws.cell(r, 2).value or '')
+        ca = str(ws.cell(r, 3).value or '').strip()
+        kakudo_raw = ws.cell(r, 9).value
+        arari = parse_number(ws.cell(r, 11).value)
+        chakuchi_raw = ws.cell(r, 17).value  # 着地日
+        kettei_raw = ws.cell(r, 18).value    # 決定日
+        dec_count = parse_number(ws.cell(r, 45).value)
+
+        if not name or not ca or ca == 'None' or ca in departed_cas:
+            continue
+
+        # Skip completed (入社済み) or NG
+        if 'NG' in status or '入社' in status:
+            continue
+
+        # Parse 確度
+        kakudo = parse_number(kakudo_raw)
+        if kakudo <= 0:
+            continue
+        # Values are 0.1-1.0 in sheet; convert to percentage
+        if kakudo <= 1.0:
+            kakudo_pct = kakudo  # Keep as decimal (0.3 = 30%)
+        else:
+            kakudo_pct = kakudo / 100.0
+
+        # 「決定」ステータスは100%
+        if status == '決定':
+            kakudo_pct = 1.0
+
+        # Skip if below 30%
+        if kakudo_pct < 0.3:
+            continue
+
+        # ===== 月判定ロジック =====
+        # 優先順位: 決定日 > 着地日
+        # 決定日があれば → その月で判定（過去Qなら除外）
+        # 決定日なし＆着地日あり → 着地日で判定
+        # どちらもなし → 未定（除外）
+        kettei_year, kettei_month = parse_date_ym(kettei_raw)
+        chakuchi_year, chakuchi_month = parse_date_ym(chakuchi_raw)
+
+        # Determine effective date for Q/month assignment
+        eff_year, eff_month = None, None
+        if kettei_year and kettei_month:
+            # 決定日がある → 決定日で判定
+            eff_year, eff_month = kettei_year, kettei_month
+        elif chakuchi_year and chakuchi_month:
+            # 決定日なし → 着地日で判定
+            eff_year, eff_month = chakuchi_year, chakuchi_month
+        else:
+            # どちらもなし → 未定
+            pass
+
+        # Check if effective date falls in current Q
+        landing_in_q = False
+        landing_month_idx = None  # 0=month1, 1=month2, 2=month3
+        if eff_year and eff_month:
+            # If effective date is before current Q → skip (past Q revenue)
+            eff_date = datetime(eff_year, eff_month, 1)
+            if eff_date < q_start_date:
+                continue  # 過去Qの決定/着地 → 2Q予測から除外
+
+            # Check if it falls in one of the Q months
+            for i, (qy, qm) in enumerate(q_months):
+                if eff_year == qy and eff_month == qm:
+                    landing_in_q = True
+                    landing_month_idx = i
+                    break
+            # If after current Q → not in this Q's forecast
+        else:
+            # No date → unscheduled
+            pass
+
+        # Calculate 期待粗利
+        kitai_arari = arari * kakudo_pct
+
+        candidates.append({
+            'name': str(name),
+            'status': status,
+            'ca': ca,
+            'kakudo': round(kakudo_pct * 100),  # As integer percentage
+            'arari': arari,
+            'kitai_arari': round(kitai_arari),
+            'eff_year': eff_year,
+            'eff_month': eff_month,
+            'has_kettei': kettei_year is not None,
+            'landing_in_q': landing_in_q,
+            'landing_month_idx': landing_month_idx,
+            'row': r,
+        })
+
+    # ===== Aggregate by CA and by month =====
+    # Active CAs (with at least one candidate or budget)
+    ca_set = set()
+    for c in candidates:
+        if c['landing_in_q']:
+            ca_set.add(c['ca'])
+
+    # Build per-CA forecast
+    ca_forecasts = {}
+    for ca in sorted(ca_set):
+        ca_cands = [c for c in candidates if c['ca'] == ca and c['landing_in_q']]
+
+        # Group by landing month
+        monthly = {}
+        for i, (y, m) in enumerate(q_months):
+            month_cands = [c for c in ca_cands if c['landing_month_idx'] == i]
+            # Sort by kakudo descending
+            month_cands.sort(key=lambda x: (-x['kakudo'], -x['arari']))
+
+            # Split into 50%+ and 30% zones
+            high_zone = [c for c in month_cands if c['kakudo'] >= 50]
+            low_zone = [c for c in month_cands if c['kakudo'] < 50]
+
+            high_total = sum(c['kitai_arari'] for c in high_zone)
+            low_total = sum(c['kitai_arari'] for c in low_zone)
+
+            monthly[i] = {
+                'year': y,
+                'month': m,
+                'label': f'{m}月',
+                'candidates': [{
+                    'name': c['name'],
+                    'kakudo': c['kakudo'],
+                    'status': c['status'],
+                    'arari': c['arari'],
+                    'kitai_arari': c['kitai_arari'],
+                } for c in month_cands],
+                'count': len(month_cands),
+                'high_zone_total': round(high_total),
+                'low_zone_total': round(low_total),
+                'total': round(high_total + low_total),
+                'kakudo_breakdown': _kakudo_breakdown(month_cands),
+            }
+
+        q_total = sum(monthly[i]['total'] for i in range(3))
+        q_high = sum(monthly[i]['high_zone_total'] for i in range(3))
+        q_low = sum(monthly[i]['low_zone_total'] for i in range(3))
+        q_count = sum(monthly[i]['count'] for i in range(3))
+
+        # Candidates NOT landing in Q (未定 or future Q)
+        unscheduled = [c for c in candidates if c['ca'] == ca and not c['landing_in_q'] and c['kakudo'] >= 30]
+
+        ca_forecasts[ca] = {
+            'monthly': monthly,
+            'q_total': round(q_total),
+            'q_high_zone': round(q_high),
+            'q_low_zone': round(q_low),
+            'q_count': q_count,
+            'unscheduled_count': len(unscheduled),
+            'unscheduled_total': round(sum(c['kitai_arari'] for c in unscheduled)),
+            'kakudo_up_candidates': [
+                {'name': c['name'], 'kakudo': c['kakudo'], 'status': c['status'], 'arari': c['arari']}
+                for c in ca_cands if 40 <= c['kakudo'] <= 60
+            ],
+        }
+
+    # ===== Company-wide totals =====
+    company_monthly = {}
+    for i, (y, m) in enumerate(q_months):
+        month_cands = [c for c in candidates if c['landing_in_q'] and c['landing_month_idx'] == i]
+        high_zone = [c for c in month_cands if c['kakudo'] >= 50]
+        low_zone = [c for c in month_cands if c['kakudo'] < 50]
+        company_monthly[i] = {
+            'year': y,
+            'month': m,
+            'label': f'{m}月',
+            'count': len(month_cands),
+            'high_zone_total': round(sum(c['kitai_arari'] for c in high_zone)),
+            'low_zone_total': round(sum(c['kitai_arari'] for c in low_zone)),
+            'total': round(sum(c['kitai_arari'] for c in month_cands)),
+            'kakudo_breakdown': _kakudo_breakdown(month_cands),
+        }
+
+    company_q_total = sum(company_monthly[i]['total'] for i in range(3))
+
+    # Get Q targets and monthly targets from DB_売上管理
+    q_info = get_current_quarter()
+    q_target = 0
+    monthly_targets = {}  # {month_idx: target}
+    current_q_sales_key = q_info['current_q_sales']
+    try:
+        ws_sales = wb['DB_売上管理']
+        # Row 3 has headers, Row 4 has 合計 目標
+        # Find Q column and monthly columns
+        q_col = None
+        month_cols = {}  # {month_num: col}
+        for col in range(2, ws_sales.max_column + 1):
+            header = str(ws_sales.cell(3, col).value or '')
+            if current_q_sales_key in header:
+                q_col = col
+            # Match monthly headers like "2026年4月"
+            for i, (y, m) in enumerate(q_months):
+                if f'{y}年{m}月' in header:
+                    month_cols[i] = col
+        if q_col:
+            q_target = parse_number(ws_sales.cell(4, q_col).value)
+        for i, col in month_cols.items():
+            monthly_targets[i] = parse_number(ws_sales.cell(4, col).value)
+    except Exception:
+        pass
+
+    monthly_target = round(q_target / 3) if q_target > 0 else 0
+
+    # Add per-month targets to company_monthly
+    for i in range(3):
+        m_target = monthly_targets.get(i, monthly_target)
+        company_monthly[i]['target'] = round(m_target)
+        company_monthly[i]['gap'] = round(company_monthly[i]['total'] - m_target)
+
+    # Get per-CA targets from DB_売上管理
+    ca_targets = {}
+    try:
+        ws_sales = wb['DB_売上管理']
+        # Each CA block is 13 rows starting from row 4
+        # Scan for CA names in column 1
+        for row in range(4, ws_sales.max_row + 1):
+            ca_name = str(ws_sales.cell(row, 1).value or '').strip()
+            item = str(ws_sales.cell(row, 2).value or '').strip()
+            if ca_name and '目標' in item and q_col:
+                ca_q_target = parse_number(ws_sales.cell(row, q_col).value)
+                if ca_q_target > 0:
+                    ca_targets[ca_name] = ca_q_target
+                    # Also get monthly targets for this CA
+                    ca_monthly_targets = {}
+                    for i, col in month_cols.items():
+                        ca_monthly_targets[i] = parse_number(ws_sales.cell(row, col).value)
+                    # Find 着地 row (should be row + 3 for CA粗利着地)
+                    for offset in range(1, 14):
+                        check_item = str(ws_sales.cell(row + offset, 2).value or '').strip()
+                        if '着地' in check_item and 'CA' in check_item:
+                            ca_db_landing = {}
+                            if q_col:
+                                ca_db_landing['q'] = parse_number(ws_sales.cell(row + offset, q_col).value)
+                            for mi, col in month_cols.items():
+                                ca_db_landing[mi] = parse_number(ws_sales.cell(row + offset, col).value)
+                            if ca_name in ca_forecasts:
+                                ca_forecasts[ca_name]['db_landing'] = ca_db_landing
+                            break
+                    if ca_name in ca_forecasts:
+                        ca_forecasts[ca_name]['q_target'] = round(ca_q_target)
+                        ca_forecasts[ca_name]['q_gap'] = round(ca_forecasts[ca_name]['q_total'] - ca_q_target)
+                        ca_forecasts[ca_name]['monthly_targets'] = {k: round(v) for k, v in ca_monthly_targets.items()}
+    except Exception as e:
+        print(f"  Warning: could not read CA targets: {e}")
+
+    result = {
+        'generated_at': today.strftime('%Y-%m-%d %H:%M'),
+        'quarter': f'FY{current_fy % 100}/{current_q}Q',
+        'q_months': [{'year': y, 'month': m, 'label': f'{m}月'} for y, m in q_months],
+        'current_month_idx': current_month_idx,
+        'q_target': round(q_target),
+        'monthly_target': monthly_target,
+        'monthly_targets': {k: round(v) for k, v in monthly_targets.items()},
+        'company': {
+            'monthly': company_monthly,
+            'q_total': round(company_q_total),
+            'q_target': round(q_target),
+            'q_gap': round(company_q_total - q_target),
+            'q_achievement_rate': round(company_q_total / q_target * 100) if q_target > 0 else 0,
+        },
+        'by_ca': ca_forecasts,
+        'total_candidates': len([c for c in candidates if c['landing_in_q']]),
+    }
+
+    return result
+
+
+def _kakudo_breakdown(cands):
+    """Count candidates by 確度 level."""
+    breakdown = {}
+    for c in cands:
+        k = c['kakudo']
+        if k not in breakdown:
+            breakdown[k] = 0
+        breakdown[k] += 1
+    return breakdown
+
 
 def extract_kpi_summary(wb):
     ws = wb['KPIダッシュボード']
@@ -1383,6 +1725,9 @@ def main():
 
     print("Extracting CA deep analysis...")
     ca_deep_analysis = extract_ca_deep_analysis(wb, sales)
+
+    print("Extracting ヨミ forecast...")
+    yomi_forecast = extract_yomi_forecast(wb)
 
     print("Extracting historical data from main_sheet...")
     main_wb = openpyxl.load_workbook('data/main_sheet.xlsx', data_only=True)
@@ -2306,6 +2651,7 @@ def main():
         'historical': historical,
         'ca_deep_analysis': ca_deep_analysis,
         'predictions': predictions,
+        'yomi_forecast': yomi_forecast,
         'lead_time_months': lead_time_months,
         'ca_status': {
             'departed': departed_cas,
