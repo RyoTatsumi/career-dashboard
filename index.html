@@ -408,7 +408,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;min-
     <div class="card" style="margin-top:20px;">
       <div class="card-title">🎛 シミュレーション（パラメータを調整して再計算）</div>
       <div id="weekly-simulator" style="padding:8px 0;">
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:end;">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;align-items:end;">
           <div>
             <label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px;">日次面談ペース (件/日)</label>
             <input type="range" id="sim-pace" min="0" max="30" step="0.5" value="0" style="width:100%">
@@ -418,6 +418,11 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;min-
             <label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px;">決定率 (%)</label>
             <input type="range" id="sim-rate" min="0" max="20" step="0.5" value="0" style="width:100%">
             <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;"><span>0</span><span id="sim-rate-val">0%</span><span>20%</span></div>
+          </div>
+          <div>
+            <label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px;">リードタイム (日)</label>
+            <input type="range" id="sim-lead" min="14" max="120" step="7" value="60" style="width:100%">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;"><span>14日</span><span id="sim-lead-val">60日</span><span>120日</span></div>
           </div>
           <div>
             <label style="font-size:12px;color:#64748b;display:block;margin-bottom:4px;">確度UP率 (40-60%帯がフェーズUP)</label>
@@ -3388,7 +3393,12 @@ function renderWeekly(){
       <div style="padding:16px;background:#f0fdf4;border-radius:12px;border-left:4px solid #10b981;">
         <div style="font-size:13px;color:#065f46;font-weight:600;margin-bottom:8px;">🟩 B. 新規面談からの予測</div>
         <div style="font-size:24px;font-weight:700;color:#065f46;">${fmtMoney(wr.new_revenue_predicted)}</div>
-        <div style="font-size:12px;color:#475569;margin-top:6px;">残${fl.effective_days}日 × 日次面談${fl.daily_interview_pace}件 = ${fl.new_interviews_predicted}件<br>× 決定率${(fl.decision_rate*100).toFixed(1)}% × 平均粗利${fmtMoney(fl.avg_profit_per_decision)}</div>
+        <div style="font-size:12px;color:#475569;margin-top:6px;">
+          ⏱ リードタイム ${fl.lead_time_days}日（面談→決定）<br>
+          有効残日数 = Q末${fl.q_end_date} − ${fl.lead_time_days}日 − 今日 = <strong>${fl.effective_days}日</strong><br>
+          (最新有効面談日: ${fl.latest_interview_date})<br>
+          ${fl.effective_days}日 × 日次${fl.daily_interview_pace}件 = ${fl.new_interviews_predicted}件 × 決定率${(fl.decision_rate*100).toFixed(1)}% × 粗利${fmtMoney(fl.avg_profit_per_decision)}
+        </div>
       </div>
     </div>
     <div style="margin-top:16px;padding:12px;background:#fef3c7;border-radius:8px;text-align:center;">
@@ -3523,33 +3533,47 @@ function setupWeeklySimulator(wr){
   const fl = wr.forecast_logic || {};
   const initPace = fl.daily_interview_pace || 0;
   const initRate = (fl.decision_rate || 0) * 100;
-  const initKakudo = 30; // 30% of 40-60% 帯がフェーズUPする想定
+  const initLead = fl.lead_time_days || 60;
+  const initKakudo = 30;
 
   const paceEl = document.getElementById('sim-pace');
   const rateEl = document.getElementById('sim-rate');
+  const leadEl = document.getElementById('sim-lead');
   const kakudoEl = document.getElementById('sim-kakudo');
 
   paceEl.value = initPace;
   rateEl.value = initRate;
+  leadEl.value = initLead;
   kakudoEl.value = initKakudo;
   document.getElementById('sim-pace-val').textContent = initPace.toFixed(1);
   document.getElementById('sim-rate-val').textContent = initRate.toFixed(1)+'%';
+  document.getElementById('sim-lead-val').textContent = initLead+'日';
   document.getElementById('sim-kakudo-val').textContent = initKakudo+'%';
+
+  // Q末日と今日からeffective_daysを計算
+  const qEnd = new Date(fl.q_end_date);
+  const today = new Date();
 
   function recalc(){
     const pace = parseFloat(paceEl.value);
     const rate = parseFloat(rateEl.value) / 100;
+    const lead = parseFloat(leadEl.value);
     const kakudoUp = parseFloat(kakudoEl.value) / 100;
+
+    // リードタイムから有効残日数を再計算
+    const latestInt = new Date(qEnd.getTime() - lead * 86400000);
+    const effDays = Math.max(0, Math.round((latestInt.getTime() - today.getTime()) / 86400000));
+
     document.getElementById('sim-pace-val').textContent = pace.toFixed(1);
     document.getElementById('sim-rate-val').textContent = (rate*100).toFixed(1)+'%';
+    document.getElementById('sim-lead-val').textContent = lead+'日 (有効'+effDays+'日)';
     document.getElementById('sim-kakudo-val').textContent = (kakudoUp*100).toFixed(0)+'%';
 
-    const newInt = (fl.effective_days || 45) * pace;
+    const newInt = effDays * pace;
     const newDec = newInt * rate;
     const newRev = newDec * (fl.avg_profit_per_decision || 1100000);
 
-    // 確度UP boost: 40-60%帯がフェーズUPすると、その差分が増える
-    // 簡易計算: 確度UP候補の合計期待値 × (kakudoUp × 0.3) を加算（30%確度UPと仮定）
+    // 確度UP boost
     const ups = wr.kakudo_up_targets || [];
     const upBoost = ups.reduce((s,t) => s + (t.arari * 0.3), 0) * kakudoUp;
 
@@ -3558,11 +3582,12 @@ function setupWeeklySimulator(wr){
     const ach = wr.q_target > 0 ? Math.round(integrated / wr.q_target * 100) : 0;
     const gapStr = gap <= 0 ? `<span style="color:#10b981">+${fmtMoney(Math.abs(gap))}</span>` : `<span style="color:#ef4444">▲${fmtMoney(gap)}</span>`;
 
-    document.getElementById('sim-result').innerHTML = `予測 ${fmtMoney(integrated)} / Gap ${gapStr} / 達成率 ${ach}%`;
+    document.getElementById('sim-result').innerHTML = `予測 ${fmtMoney(integrated)} / Gap ${gapStr} / 達成率 ${ach}% <span style="font-size:12px;color:#64748b;margin-left:8px;">(B: 残${effDays}日 × ${pace}件 × ${(rate*100).toFixed(1)}% = ${fmtMoney(newRev)})</span>`;
   }
 
   paceEl.oninput = recalc;
   rateEl.oninput = recalc;
+  leadEl.oninput = recalc;
   kakudoEl.oninput = recalc;
   recalc();
 }

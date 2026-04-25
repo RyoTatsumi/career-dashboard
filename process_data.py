@@ -932,11 +932,15 @@ def build_weekly_report(yomi_forecast, sales, ca_funnel, kpi, ca_comparison, q_i
     prev_q_actual = prev_q_data.get('実績(粗利)', 0)
     avg_profit_per_decision = prev_q_actual / prev_q_decisions if prev_q_decisions > 0 else 1100000
 
-    # 残日数 × 日次面談ペース → 残面談数
-    # ただしリードタイム2-3か月なので、Q末までの面談からは決定が遅れて出る
-    # → 「残面談数 × 決定率 × 平均粗利」だが、実際にQ内に着地するのは
-    #   面談実施から平均1.5か月以内に決まるもの = 残日数のうち45日まで
-    effective_days = min(days_remaining, 45)
+    # ===== リードタイム考慮 =====
+    # 初回面談から決定までの平均リードタイム = 2か月（60日）
+    # Q末までに決定するには、Q末 - 60日 までに面談する必要がある
+    # 例: Q2末 6/30 → 最新有効面談日 = 4/30
+    # 今日が4/25 → 有効残日数 = 5日
+    lead_time_days = 60
+    latest_interview_date = q_end - __import__('datetime').timedelta(days=lead_time_days)
+    effective_days = max(0, (latest_interview_date - today).days)
+
     new_interviews_predicted = effective_days * daily_interview_pace
     new_decisions_predicted = new_interviews_predicted * decision_rate
     new_revenue_predicted = new_decisions_predicted * avg_profit_per_decision
@@ -1204,6 +1208,9 @@ def build_weekly_report(yomi_forecast, sales, ca_funnel, kpi, ca_comparison, q_i
             'recent_interview_total': recent_interview_total,
             'recent_months': recent_months,
             'effective_days': effective_days,
+            'lead_time_days': lead_time_days,
+            'latest_interview_date': latest_interview_date.strftime('%Y-%m-%d'),
+            'q_end_date': q_end.strftime('%Y-%m-%d'),
             'new_interviews_predicted': round(new_interviews_predicted),
             'new_decisions_predicted': round(new_decisions_predicted, 1),
         },

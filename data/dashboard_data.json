@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-25 13:06:47",
+  "generated_at": "2026-04-25 13:16:26",
   "kpi": {
     "avg_profit": 1000000.0,
     "q_progress": 0.26373626373626374,
@@ -20295,7 +20295,7 @@
     ]
   },
   "weekly_pulse": {
-    "generated_at": "2026-04-25 13:06",
+    "generated_at": "2026-04-25 13:16",
     "month_progress": 0.83,
     "current_month": "2026-04",
     "prev_month": "2026-03",
@@ -29087,7 +29087,7 @@
     }
   },
   "yomi_forecast": {
-    "generated_at": "2026-04-25 13:06",
+    "generated_at": "2026-04-25 13:16",
     "quarter": "FY26/2Q",
     "q_months": [
       {
@@ -30372,7 +30372,7 @@
     "total_candidates": 61
   },
   "weekly_report": {
-    "generated_at": "2026-04-25 13:06",
+    "generated_at": "2026-04-25 13:16",
     "quarter": "FY26/2Q",
     "q_target": 44800000.0,
     "q_actual": 7671565.0,
@@ -30380,10 +30380,10 @@
     "days_remaining": 65,
     "q_progress": 0.27472527472527475,
     "pipeline_forecast": 30776319,
-    "new_revenue_predicted": 12518721,
-    "integrated_forecast": 43295040,
-    "gap": 1504960,
-    "achievement_rate": 0.9664071373769856,
+    "new_revenue_predicted": 1390969,
+    "integrated_forecast": 32167288,
+    "gap": 12632712,
+    "achievement_rate": 0.7180198208196651,
     "forecast_logic": {
       "daily_interview_pace": 9.29,
       "decision_rate": 0.027624309392265192,
@@ -30394,14 +30394,17 @@
         "2026-02",
         "2026-01"
       ],
-      "effective_days": 45,
-      "new_interviews_predicted": 418,
-      "new_decisions_predicted": 11.5
+      "effective_days": 5,
+      "lead_time_days": 60,
+      "latest_interview_date": "2026-05-01",
+      "q_end_date": "2026-06-30",
+      "new_interviews_predicted": 46,
+      "new_decisions_predicted": 1.3
     },
-    "needed_interviews": 50,
-    "needed_decisions": 1.4,
-    "needed_daily_pace": 1.12,
-    "pace_gap": -8.17,
+    "needed_interviews": 422,
+    "needed_decisions": 11.7,
+    "needed_daily_pace": 84.36,
+    "pace_gap": 75.07,
     "hot_pipeline": 19480569,
     "hot_count": 24,
     "kakudo_up_targets": [
@@ -30490,10 +30493,10 @@
     "trend_data": [
       {
         "date": "2026-04-25",
-        "forecast": 43295039.75448895,
+        "forecast": 32167287.972720996,
         "pipeline": 30776319,
         "hot": 19480569,
-        "achievement": 0.9664071373769856
+        "achievement": 0.7180198208196651
       }
     ],
     "ca_weekly_change": {},
@@ -30501,25 +30504,25 @@
       "辰巳": {
         "q_target": 3500000,
         "pipeline_forecast": 1050000,
-        "new_revenue_predicted": 585445,
-        "integrated_forecast": 1635445,
-        "gap": 1864555,
-        "achievement_rate": 0.46726996125,
+        "new_revenue_predicted": 65049,
+        "integrated_forecast": 1115049,
+        "gap": 2384951,
+        "achievement_rate": 0.31858555125000004,
         "daily_interview_pace": 0.6,
         "decision_rate": 0.02,
         "recent_interviews": 54,
-        "needed_interviews": 86,
-        "needed_decisions": 1.7,
+        "needed_interviews": 110,
+        "needed_decisions": 2.2,
         "q_count": 2,
         "q_high_zone": 0
       },
       "黒川": {
         "q_target": 8000000,
         "pipeline_forecast": 7753000,
-        "new_revenue_predicted": 3495972,
-        "integrated_forecast": 11248972,
-        "gap": -3248972,
-        "achievement_rate": 1.4061215008146726,
+        "new_revenue_predicted": 388441,
+        "integrated_forecast": 8141441,
+        "gap": -141441,
+        "achievement_rate": 1.0176801667571858,
         "daily_interview_pace": 1.488888888888889,
         "decision_rate": 0.0481283422459893,
         "recent_interviews": 134,
@@ -30531,60 +30534,60 @@
       "古谷": {
         "q_target": 7000000,
         "pipeline_forecast": 4535139,
-        "new_revenue_predicted": 1512260,
-        "integrated_forecast": 6047399,
-        "gap": 952601,
-        "achievement_rate": 0.8639141769230769,
+        "new_revenue_predicted": 168029,
+        "integrated_forecast": 4703168,
+        "gap": 2296832,
+        "achievement_rate": 0.6718811307692308,
         "daily_interview_pace": 1.511111111111111,
         "decision_rate": 0.020512820512820513,
         "recent_interviews": 136,
-        "needed_interviews": 43,
-        "needed_decisions": 0.9,
+        "needed_interviews": 103,
+        "needed_decisions": 2.1,
         "q_count": 9,
         "q_high_zone": 2906589
       },
       "嘉重": {
         "q_target": 8000000,
         "pipeline_forecast": 6373160,
-        "new_revenue_predicted": 2335108,
-        "integrated_forecast": 8708268,
-        "gap": -708268,
-        "achievement_rate": 1.0885334651442307,
+        "new_revenue_predicted": 259456,
+        "integrated_forecast": 6632616,
+        "gap": 1367384,
+        "achievement_rate": 0.8290770516826923,
         "daily_interview_pace": 0.9777777777777777,
         "decision_rate": 0.04895104895104895,
         "recent_interviews": 88,
-        "needed_interviews": 0,
-        "needed_decisions": 0,
+        "needed_interviews": 26,
+        "needed_decisions": 1.3,
         "q_count": 11,
         "q_high_zone": 3922460
       },
       "百石": {
         "q_target": 7000000,
         "pipeline_forecast": 4530300,
-        "new_revenue_predicted": 2460822,
-        "integrated_forecast": 6991122,
-        "gap": 8878,
-        "achievement_rate": 0.9987317228717292,
+        "new_revenue_predicted": 273425,
+        "integrated_forecast": 4803725,
+        "gap": 2196275,
+        "achievement_rate": 0.6862463819063827,
         "daily_interview_pace": 1.4555555555555555,
         "decision_rate": 0.034653465346534656,
         "recent_interviews": 131,
-        "needed_interviews": 0,
-        "needed_decisions": 0.0,
+        "needed_interviews": 58,
+        "needed_decisions": 2.0,
         "q_count": 7,
         "q_high_zone": 3706800
       },
       "石丸": {
         "q_target": 3500000,
         "pipeline_forecast": 2170500,
-        "new_revenue_predicted": 1068669,
-        "integrated_forecast": 3239169,
-        "gap": 260831,
-        "achievement_rate": 0.9254769133928571,
+        "new_revenue_predicted": 118741,
+        "integrated_forecast": 2289241,
+        "gap": 1210759,
+        "achievement_rate": 0.6540688633928572,
         "daily_interview_pace": 0.7666666666666667,
         "decision_rate": 0.02857142857142857,
         "recent_interviews": 69,
-        "needed_interviews": 8,
-        "needed_decisions": 0.2,
+        "needed_interviews": 39,
+        "needed_decisions": 1.1,
         "q_count": 8,
         "q_high_zone": 0
       },
@@ -30608,7 +30611,7 @@
       "辰巳": [
         {
           "type": "gap",
-          "message": "Gap ▲186万 → 追加1.7件決定 / 86件面談必要"
+          "message": "Gap ▲238万 → 追加2.2件決定 / 110件面談必要"
         },
         {
           "type": "pace",
@@ -30619,20 +30622,25 @@
       "古谷": [
         {
           "type": "gap",
-          "message": "Gap ▲95万 → 追加0.9件決定 / 43件面談必要"
+          "message": "Gap ▲230万 → 追加2.1件決定 / 103件面談必要"
         }
       ],
-      "嘉重": [],
+      "嘉重": [
+        {
+          "type": "gap",
+          "message": "Gap ▲137万 → 追加1.3件決定 / 26件面談必要"
+        }
+      ],
       "百石": [
         {
           "type": "gap",
-          "message": "Gap ▲1万 → 追加0.0件決定 / 0件面談必要"
+          "message": "Gap ▲220万 → 追加2.0件決定 / 58件面談必要"
         }
       ],
       "石丸": [
         {
           "type": "gap",
-          "message": "Gap ▲26万 → 追加0.2件決定 / 8件面談必要"
+          "message": "Gap ▲121万 → 追加1.1件決定 / 39件面談必要"
         },
         {
           "type": "pace",
@@ -30654,7 +30662,12 @@
       {
         "type": "gap",
         "priority": "high",
-        "message": "Gap ▲150万円を埋めるには、追加で1.4件の決定（50件の新規面談）が必要"
+        "message": "Gap ▲1263万円を埋めるには、追加で11.7件の決定（422件の新規面談）が必要"
+      },
+      {
+        "type": "pace",
+        "priority": "high",
+        "message": "必要日次面談ペース 84.4件/日 > 現状 9.3件/日 → 日次+75.1件UP必須"
       },
       {
         "type": "hot",
