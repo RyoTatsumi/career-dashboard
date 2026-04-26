@@ -901,29 +901,21 @@ def build_weekly_report(yomi_forecast, sales, ca_funnel, kpi, ca_comparison, q_i
     days_in_3mo = 90
     daily_interview_pace = recent_interview_total / days_in_3mo if recent_interview_total > 0 else 0
 
-    # 決定率: 過去6か月のデータから算出（より安定した数値）
-    # リードタイム2か月想定で、面談から決定までの転換率を計算
-    six_months = []
-    for offset in range(2, 8):  # 2-7か月前
+    # 決定率: 「直近2か月除外+過去12か月」で算出
+    # リードタイム2か月以内の面談はまだ決定が出揃っていないため除外し、
+    # 完結したコホートだけで率を計算 → 約6%（FY25実績7.7%に近い安定値）
+    rate_window_months = []
+    for offset in range(2, 14):  # 2か月前 〜 13か月前
         m = today.month - offset
         y = today.year
-        if m <= 0:
+        while m <= 0:
             m += 12
             y -= 1
-        six_months.append(f'{y}-{m:02d}')
+        rate_window_months.append(f'{y}-{m:02d}')
 
-    six_months_decisions = []
-    for offset in range(0, 6):  # 直近6か月の決定
-        m = today.month - offset
-        y = today.year
-        if m <= 0:
-            m += 12
-            y -= 1
-        six_months_decisions.append(f'{y}-{m:02d}')
-
-    interviews_6mo = sum(funnel.get('初回面談', {}).get(m, 0) for m in six_months)
-    decisions_6mo = sum(funnel.get('決定', {}).get(m, 0) for m in six_months_decisions)
-    decision_rate = decisions_6mo / interviews_6mo if interviews_6mo > 0 else 0.05
+    interviews_rate_window = sum(funnel.get('初回面談', {}).get(m, 0) for m in rate_window_months)
+    decisions_rate_window = sum(funnel.get('決定', {}).get(m, 0) for m in rate_window_months)
+    decision_rate = decisions_rate_window / interviews_rate_window if interviews_rate_window > 0 else 0.06
 
     # 平均粗利（過去Q）
     prev_q_key = q_info['confirmed_q']
@@ -1112,9 +1104,9 @@ def build_weekly_report(yomi_forecast, sales, ca_funnel, kpi, ca_comparison, q_i
         ca_recent_interviews = sum(ca_f.get('初回面談', {}).get(m, 0) for m in recent_months)
         ca_daily_pace = ca_recent_interviews / 90 if ca_recent_interviews > 0 else 0
 
-        ca_int_6mo = sum(ca_f.get('初回面談', {}).get(m, 0) for m in six_months)
-        ca_dec_6mo = sum(ca_f.get('決定', {}).get(m, 0) for m in six_months_decisions)
-        ca_dec_rate = ca_dec_6mo / ca_int_6mo if ca_int_6mo > 0 else decision_rate
+        ca_int_window = sum(ca_f.get('初回面談', {}).get(m, 0) for m in rate_window_months)
+        ca_dec_window = sum(ca_f.get('決定', {}).get(m, 0) for m in rate_window_months)
+        ca_dec_rate = ca_dec_window / ca_int_window if ca_int_window > 0 else decision_rate
 
         ca_new_int_pred = effective_days * ca_daily_pace
         ca_new_dec_pred = ca_new_int_pred * ca_dec_rate
@@ -1304,6 +1296,9 @@ def build_weekly_report(yomi_forecast, sales, ca_funnel, kpi, ca_comparison, q_i
         'forecast_logic': {
             'daily_interview_pace': round(daily_interview_pace, 2),
             'decision_rate': decision_rate,
+            'decision_rate_window': f'{rate_window_months[-1]} 〜 {rate_window_months[0]} (直近2か月除外+過去12か月)',
+            'decision_rate_interviews': interviews_rate_window,
+            'decision_rate_decisions': decisions_rate_window,
             'avg_profit_per_decision': round(avg_profit_per_decision),
             'recent_interview_total': recent_interview_total,
             'recent_months': recent_months,
