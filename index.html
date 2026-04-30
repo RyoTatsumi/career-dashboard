@@ -472,9 +472,12 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;min-
     <!-- Manager Manual Input -->
     <div class="card" style="margin-top:20px;">
       <div class="card-title">📝 マネージャー予測（手入力 / 統計予測の下に追加）
-        <button id="mgr-reset-btn" style="float:right;font-size:11px;padding:4px 10px;background:#e2e8f0;border:none;border-radius:4px;cursor:pointer;">統計予測を初期値にセット</button>
+        <span style="float:right;">
+          <button id="mgr-add-col-btn" style="font-size:11px;padding:4px 10px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;margin-right:6px;">＋ 列を追加</button>
+          <button id="mgr-reset-btn" style="font-size:11px;padding:4px 10px;background:#e2e8f0;border:none;border-radius:4px;cursor:pointer;">統計予測を初期値にセット</button>
+        </span>
       </div>
-      <div style="font-size:12px;color:#64748b;margin-bottom:8px;">合計行は自動計算。各CAの数値・アラートを直接編集できます（ブラウザに保存）。</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:8px;">合計行は自動計算。数値列はクリックで集計対象切替可。各CAの値・アラートを直接編集（ブラウザに保存）。</div>
       <div id="weekly-manager-input" style="overflow-x:auto;"></div>
     </div>
 
@@ -3367,6 +3370,52 @@ function renderWeekly(){
     return;
   }
 
+  // ===== 時刻依存値をブラウザ時刻で再計算（データが古くても今日の値を出す）=====
+  const fl = wr.forecast_logic || {};
+  const today = new Date();
+  if(fl.q_end_date){
+    const qEnd = new Date(fl.q_end_date);
+    // 残日数を再計算
+    const liveDaysRemaining = Math.max(0, Math.round((qEnd.getTime() - today.getTime()) / 86400000));
+    wr.days_remaining = liveDaysRemaining;
+    // 有効残日数を再計算
+    const lead = fl.lead_time_days || 60;
+    const latestInt = new Date(qEnd.getTime() - lead * 86400000);
+    const liveEffDays = Math.max(0, Math.round((latestInt.getTime() - today.getTime()) / 86400000));
+    fl.effective_days = liveEffDays;
+    fl.latest_interview_date = latestInt.toISOString().slice(0,10);
+    // B予測も再計算
+    if(fl.daily_interview_pace && fl.decision_rate && fl.avg_profit_per_decision){
+      const newInt = liveEffDays * fl.daily_interview_pace;
+      const newDec = newInt * fl.decision_rate;
+      fl.new_interviews_predicted = Math.round(newInt);
+      fl.new_decisions_predicted = Math.round(newDec * 10) / 10;
+      wr.new_revenue_predicted = Math.round(newDec * fl.avg_profit_per_decision);
+      wr.integrated_forecast = Math.round((wr.pipeline_forecast || 0) + wr.new_revenue_predicted);
+      wr.gap = wr.q_target - wr.integrated_forecast;
+      wr.achievement_rate = wr.q_target > 0 ? wr.integrated_forecast / wr.q_target : 0;
+    }
+  }
+
+  // ===== データの古さ警告 =====
+  // Remove any existing warning first
+  document.querySelectorAll('.data-stale-warning').forEach(el => el.remove());
+  const generatedAt = DATA.generated_at;
+  if(generatedAt){
+    const gen = new Date(generatedAt.replace(' ', 'T'));
+    const ageDays = (today.getTime() - gen.getTime()) / 86400000;
+    if(ageDays > 2){
+      const warningHtml = `<div class="data-stale-warning" style="margin-bottom:16px;padding:12px;background:#fef2f2;border-left:4px solid #ef4444;border-radius:8px;font-size:13px;color:#7f1d1d;">
+        ⚠️ <strong>データが ${Math.floor(ageDays)} 日前のものです</strong>（最終更新: ${generatedAt}）。
+        実績・確度などスプレッドシート由来の数値が古い可能性があります。
+        残日数・予測ロジックなど時刻依存の値はブラウザ時刻で再計算しています。<br>
+        <span style="font-size:11px;">対処: GitHub.com → Actions → "Update Dashboard" → "Run workflow" で手動更新できます。</span>
+      </div>`;
+      const kpis = document.getElementById('weekly-kpis');
+      if(kpis) kpis.insertAdjacentHTML('beforebegin', warningHtml);
+    }
+  }
+
   // ===== KPI Cards =====
   const gap = wr.gap;
   const gapClass = gap <= 0 ? 'kpi-up' : 'kpi-down';
@@ -3405,7 +3454,7 @@ function renderWeekly(){
   `;
 
   // ===== Forecast Logic Breakdown =====
-  const fl = wr.forecast_logic || {};
+  // (fl is already declared at top of function for time-recomputation)
   document.getElementById('weekly-forecast-breakdown').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px;">
       <div style="padding:16px;background:#eff6ff;border-radius:12px;border-left:4px solid #3b82f6;">
@@ -3677,9 +3726,24 @@ function renderManagerInput(wr){
   const cas = (DATA.kpi?.ca_names || []).filter(c => !departed.includes(c));
   const storageKey = `manager_input_${wr.quarter}`;
 
-  // Load saved data
+  // Load saved data: { _columns: [...], 'CA名': {...} }
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch(e){}
+
+  // Default columns (always present)
+  const DEFAULT_COLUMNS = [
+    {id: 'target', name: '目標(万)', type: 'number', sumInTotal: true, isDefault: true},
+    {id: 'predict', name: '予測(万)', type: 'number', sumInTotal: true, isDefault: true},
+    {id: 'interviews', name: '面談配分', type: 'number', sumInTotal: true, isDefault: true},
+  ];
+  if(!saved._columns) saved._columns = [];
+  // Custom columns from saved
+  const customCols = saved._columns;
+
+  // All columns to render (default + custom)
+  function getAllColumns(){
+    return [...DEFAULT_COLUMNS, ...customCols];
+  }
 
   // Default values from weekly_report (in 万 unit)
   function getDefaults(){
@@ -3697,7 +3761,6 @@ function renderManagerInput(wr){
     return defaults;
   }
 
-  // Merge saved + defaults
   function getCurrentData(){
     const defaults = getDefaults();
     const data = {};
@@ -3710,6 +3773,10 @@ function renderManagerInput(wr){
         status: s.status || '',
         alert: s.alert || '',
       };
+      // Custom columns
+      customCols.forEach(c => {
+        data[ca][c.id] = s[c.id] !== undefined ? s[c.id] : (c.type === 'number' ? 0 : '');
+      });
     });
     return data;
   }
@@ -3724,43 +3791,59 @@ function renderManagerInput(wr){
     localStorage.setItem(storageKey, JSON.stringify(saved));
   }
 
+  function escapeAttr(s){ return String(s||'').replace(/"/g,'&quot;'); }
+
   function render(){
     const data = getCurrentData();
+    const allCols = getAllColumns();
+
     let html = '<table class="data-table" style="font-size:13px;"><thead><tr>';
     html += '<th style="background:#fef2f2;color:#7f1d1d;">CA名</th>';
-    html += '<th class="num" style="background:#fef2f2;color:#7f1d1d;">目標(万)</th>';
-    html += '<th class="num" style="background:#fef2f2;color:#7f1d1d;">予測(万)</th>';
-    html += '<th class="num" style="background:#fef2f2;color:#7f1d1d;">面談配分</th>';
+    allCols.forEach(c => {
+      const sumIcon = c.sumInTotal ? '<span title="合計に含む" style="color:#10b981;font-size:10px;cursor:pointer;" data-toggle-sum="'+c.id+'">●</span>' : '<span title="合計に含めない (クリックで含める)" style="color:#cbd5e1;font-size:10px;cursor:pointer;" data-toggle-sum="'+c.id+'">○</span>';
+      const delBtn = c.isDefault ? '' : `<span data-del-col="${c.id}" title="列を削除" style="color:#ef4444;font-size:11px;margin-left:4px;cursor:pointer;">×</span>`;
+      html += `<th class="num" style="background:#fef2f2;color:#7f1d1d;">${c.name} ${sumIcon}${delBtn}</th>`;
+    });
     html += '<th style="background:#fef2f2;color:#7f1d1d;">アラート</th>';
     html += '</tr></thead><tbody>';
 
     // 合計行
-    const sumT = cas.reduce((s,c) => s + (parseFloat(data[c].target)||0), 0);
-    const sumP = cas.reduce((s,c) => s + (parseFloat(data[c].predict)||0), 0);
-    const sumI = cas.reduce((s,c) => s + (parseFloat(data[c].interviews)||0), 0);
-    const gapMgr = sumP - sumT;
+    const sums = {};
+    allCols.forEach(c => {
+      sums[c.id] = c.type === 'number' && c.sumInTotal ? cas.reduce((s, ca) => s + (parseFloat(data[ca][c.id])||0), 0) : null;
+    });
+    const gapMgr = (sums.predict || 0) - (sums.target || 0);
     const gapColor = gapMgr >= 0 ? '#10b981' : '#ef4444';
-    html += `<tr style="background:#fffbeb;font-weight:700;">
-      <td>合計</td>
-      <td class="num" id="mgr-sum-target">${sumT.toLocaleString()}</td>
-      <td class="num" id="mgr-sum-predict" style="color:${gapColor};">${sumP.toLocaleString()}</td>
-      <td class="num" id="mgr-sum-interviews">${sumI.toLocaleString()}</td>
-      <td><span style="font-size:12px;color:#78350f;">予測${sumP >= sumT ? '+' : '▲'}${Math.abs(gapMgr).toLocaleString()}万 vs 目標</span></td>
-    </tr>`;
+
+    html += `<tr style="background:#fffbeb;font-weight:700;"><td>合計</td>`;
+    allCols.forEach(c => {
+      if(c.type === 'number' && c.sumInTotal){
+        const styleAttr = c.id === 'predict' ? `style="color:${gapColor};"` : '';
+        html += `<td class="num" id="mgr-sum-${c.id}" ${styleAttr}>${sums[c.id].toLocaleString()}</td>`;
+      } else {
+        html += '<td class="num">-</td>';
+      }
+    });
+    html += `<td><span id="mgr-gap-label" style="font-size:12px;color:#78350f;">予測${gapMgr >= 0 ? '+' : '▲'}${Math.abs(gapMgr).toLocaleString()}万 vs 目標</span></td></tr>`;
 
     cas.forEach(ca => {
       const d = data[ca];
       const color = CA_COLORS[ca] || '#64748b';
-      html += `<tr data-ca="${ca}">
-        <td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:6px;"></span>${ca}</td>
-        <td class="num"><input type="number" class="mi-input mi-target" value="${d.target}" style="width:80px;text-align:right;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;"></td>
-        <td class="num"><input type="number" class="mi-input mi-predict" value="${d.predict}" style="width:80px;text-align:right;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;"></td>
-        <td class="num"><input type="number" class="mi-input mi-interviews" value="${d.interviews}" style="width:60px;text-align:right;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;"></td>
-        <td>
-          <span class="mi-status" style="cursor:pointer;font-size:18px;margin-right:6px;user-select:none;" title="クリックでアイコン切替">${d.status || '⚪'}</span>
-          <input type="text" class="mi-input mi-alert" value="${d.alert.replace(/"/g,'&quot;')}" placeholder="アラートコメント..." style="width:calc(100% - 40px);padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;">
-        </td>
-      </tr>`;
+      html += `<tr data-ca="${ca}">`;
+      html += `<td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:6px;"></span>${ca}</td>`;
+      allCols.forEach(c => {
+        const v = d[c.id];
+        const w = c.type === 'number' ? 80 : 120;
+        if(c.type === 'number'){
+          html += `<td class="num"><input type="number" class="mi-input" data-col="${c.id}" value="${v}" style="width:${w}px;text-align:right;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;"></td>`;
+        } else {
+          html += `<td><input type="text" class="mi-input" data-col="${c.id}" value="${escapeAttr(v)}" style="width:100%;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;"></td>`;
+        }
+      });
+      html += `<td>
+        <span class="mi-status" style="cursor:pointer;font-size:18px;margin-right:6px;user-select:none;" title="クリックでアイコン切替">${d.status || '⚪'}</span>
+        <input type="text" class="mi-input mi-alert" value="${escapeAttr(d.alert)}" placeholder="アラートコメント..." style="width:calc(100% - 40px);padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;">
+      </td></tr>`;
     });
     html += '</tbody></table>';
     document.getElementById('weekly-manager-input').innerHTML = html;
@@ -3770,24 +3853,21 @@ function renderManagerInput(wr){
       const ca = row.dataset.ca;
       if(!saved[ca]) saved[ca] = {};
 
-      row.querySelector('.mi-target').addEventListener('input', e => {
-        saved[ca].target = parseFloat(e.target.value) || 0;
-        save();
-        recalcSums();
-      });
-      row.querySelector('.mi-predict').addEventListener('input', e => {
-        saved[ca].predict = parseFloat(e.target.value) || 0;
-        save();
-        recalcSums();
-      });
-      row.querySelector('.mi-interviews').addEventListener('input', e => {
-        saved[ca].interviews = parseFloat(e.target.value) || 0;
-        save();
-        recalcSums();
-      });
-      row.querySelector('.mi-alert').addEventListener('input', e => {
-        saved[ca].alert = e.target.value;
-        save();
+      row.querySelectorAll('.mi-input').forEach(inp => {
+        if(inp.classList.contains('mi-alert')){
+          inp.addEventListener('input', e => {
+            saved[ca].alert = e.target.value;
+            save();
+          });
+        } else {
+          const colId = inp.dataset.col;
+          inp.addEventListener('input', e => {
+            const val = inp.type === 'number' ? (parseFloat(e.target.value) || 0) : e.target.value;
+            saved[ca][colId] = val;
+            save();
+            recalcSums();
+          });
+        }
       });
       row.querySelector('.mi-status').addEventListener('click', e => {
         const ns = nextStatus(saved[ca].status || '');
@@ -3796,32 +3876,87 @@ function renderManagerInput(wr){
         save();
       });
     });
+
+    // Toggle sum-in-total
+    document.querySelectorAll('[data-toggle-sum]').forEach(el => {
+      el.addEventListener('click', e => {
+        const cid = e.target.dataset.toggleSum;
+        // Default columns: store override in customCols-like structure
+        const defaultCol = DEFAULT_COLUMNS.find(c => c.id === cid);
+        const customCol = customCols.find(c => c.id === cid);
+        if(defaultCol){
+          defaultCol.sumInTotal = !defaultCol.sumInTotal;
+        } else if(customCol){
+          customCol.sumInTotal = !customCol.sumInTotal;
+          save();
+        }
+        render();
+      });
+    });
+
+    // Delete custom column
+    document.querySelectorAll('[data-del-col]').forEach(el => {
+      el.addEventListener('click', e => {
+        const cid = e.target.dataset.delCol;
+        const col = customCols.find(c => c.id === cid);
+        if(col && confirm(`列「${col.name}」を削除しますか？\n各CAに入力されたこの列の値も削除されます。`)){
+          // Remove from columns
+          const idx = customCols.findIndex(c => c.id === cid);
+          customCols.splice(idx, 1);
+          // Remove from each CA
+          cas.forEach(ca => {
+            if(saved[ca] && cid in saved[ca]) delete saved[ca][cid];
+          });
+          save();
+          render();
+        }
+      });
+    });
   }
 
   function recalcSums(){
     const data = getCurrentData();
-    const sumT = cas.reduce((s,c) => s + (parseFloat(data[c].target)||0), 0);
-    const sumP = cas.reduce((s,c) => s + (parseFloat(data[c].predict)||0), 0);
-    const sumI = cas.reduce((s,c) => s + (parseFloat(data[c].interviews)||0), 0);
+    const allCols = getAllColumns();
+    let sumT = 0, sumP = 0;
+    allCols.forEach(c => {
+      if(c.type === 'number' && c.sumInTotal){
+        const sum = cas.reduce((s, ca) => s + (parseFloat(data[ca][c.id])||0), 0);
+        const el = document.getElementById('mgr-sum-' + c.id);
+        if(el) el.textContent = sum.toLocaleString();
+        if(c.id === 'target') sumT = sum;
+        if(c.id === 'predict') sumP = sum;
+      }
+    });
     const gapMgr = sumP - sumT;
     const gapColor = gapMgr >= 0 ? '#10b981' : '#ef4444';
-    document.getElementById('mgr-sum-target').textContent = sumT.toLocaleString();
-    document.getElementById('mgr-sum-predict').textContent = sumP.toLocaleString();
-    document.getElementById('mgr-sum-predict').style.color = gapColor;
-    document.getElementById('mgr-sum-interviews').textContent = sumI.toLocaleString();
-    // Update gap label
-    const gapLabel = document.querySelector('#weekly-manager-input tbody tr:first-child td:last-child span');
-    if(gapLabel){
-      gapLabel.textContent = `予測${sumP >= sumT ? '+' : '▲'}${Math.abs(gapMgr).toLocaleString()}万 vs 目標`;
-    }
+    const predEl = document.getElementById('mgr-sum-predict');
+    if(predEl) predEl.style.color = gapColor;
+    const gapLabel = document.getElementById('mgr-gap-label');
+    if(gapLabel) gapLabel.textContent = `予測${gapMgr >= 0 ? '+' : '▲'}${Math.abs(gapMgr).toLocaleString()}万 vs 目標`;
+  }
+
+  // Add column button
+  const addBtn = document.getElementById('mgr-add-col-btn');
+  if(addBtn){
+    addBtn.onclick = () => {
+      const name = prompt('新しい列名を入力（例: 確度UP予定数）:', '');
+      if(!name) return;
+      const type = confirm('数値型にしますか？ OK = 数値 / キャンセル = テキスト') ? 'number' : 'text';
+      const sumInTotal = type === 'number' ? confirm('合計行に集計しますか？ OK=集計する / キャンセル=しない') : false;
+      const id = 'col_' + Date.now();
+      customCols.push({id, name, type, sumInTotal});
+      save();
+      render();
+    };
   }
 
   // Reset button
   const resetBtn = document.getElementById('mgr-reset-btn');
   if(resetBtn){
     resetBtn.onclick = () => {
-      if(confirm('現在の入力を破棄して、統計予測の値を初期値としてセットしますか？')) {
-        saved = {};
+      if(confirm('現在の入力（追加列含む）を破棄して、統計予測の値を初期値としてセットしますか？')) {
+        saved = {_columns: []};
+        customCols.length = 0;
         localStorage.removeItem(storageKey);
         render();
       }
