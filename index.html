@@ -3797,14 +3797,15 @@ function renderManagerInput(wr){
     const data = getCurrentData();
     const allCols = getAllColumns();
 
-    let html = '<table class="data-table" style="font-size:13px;"><thead><tr>';
-    html += '<th style="background:#fef2f2;color:#7f1d1d;">CA名</th>';
+    let html = '<table class="data-table" style="font-size:13px;width:100%;table-layout:fixed;"><thead><tr>';
+    html += '<th style="background:#fef2f2;color:#7f1d1d;width:90px;">CA名</th>';
     allCols.forEach(c => {
       const sumIcon = c.sumInTotal ? '<span title="合計に含む" style="color:#10b981;font-size:10px;cursor:pointer;" data-toggle-sum="'+c.id+'">●</span>' : '<span title="合計に含めない (クリックで含める)" style="color:#cbd5e1;font-size:10px;cursor:pointer;" data-toggle-sum="'+c.id+'">○</span>';
       const delBtn = c.isDefault ? '' : `<span data-del-col="${c.id}" title="列を削除" style="color:#ef4444;font-size:11px;margin-left:4px;cursor:pointer;">×</span>`;
-      html += `<th class="num" style="background:#fef2f2;color:#7f1d1d;">${c.name} ${sumIcon}${delBtn}</th>`;
+      const colWidth = c.type === 'number' ? 100 : 130;
+      html += `<th class="num" style="background:#fef2f2;color:#7f1d1d;width:${colWidth}px;">${c.name} ${sumIcon}${delBtn}</th>`;
     });
-    html += '<th style="background:#fef2f2;color:#7f1d1d;">アラート</th>';
+    html += '<th style="background:#fef2f2;color:#7f1d1d;">アラート（メモ）</th>';
     html += '</tr></thead><tbody>';
 
     // 合計行
@@ -3841,8 +3842,10 @@ function renderManagerInput(wr){
         }
       });
       html += `<td>
-        <span class="mi-status" style="cursor:pointer;font-size:18px;margin-right:6px;user-select:none;" title="クリックでアイコン切替">${d.status || '⚪'}</span>
-        <input type="text" class="mi-input mi-alert" value="${escapeAttr(d.alert)}" placeholder="アラートコメント..." style="width:calc(100% - 40px);padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="mi-status" style="cursor:pointer;font-size:18px;user-select:none;flex-shrink:0;" title="クリックでアイコン切替">${d.status || '⚪'}</span>
+          <input type="text" class="mi-input mi-alert" value="${escapeAttr(d.alert)}" placeholder="アラートコメントを入力..." style="flex:1;min-width:0;padding:6px 8px;border:1px solid #e2e8f0;border-radius:4px;">
+        </div>
       </td></tr>`;
     });
     html += '</tbody></table>';
