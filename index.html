@@ -471,8 +471,9 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;min-
 
     <!-- Manager Manual Input -->
     <div class="card" style="margin-top:20px;">
-      <div class="card-title">📝 マネージャー予測（手入力 / 統計予測の下に追加）
+      <div class="card-title">📝 マネージャー予測（手入力）
         <span style="float:right;">
+          <button id="mgr-add-row-btn" style="font-size:11px;padding:4px 10px;background:#10b981;color:white;border:none;border-radius:4px;cursor:pointer;margin-right:6px;">＋ 行を追加</button>
           <button id="mgr-add-col-btn" style="font-size:11px;padding:4px 10px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;margin-right:6px;">＋ 列を追加</button>
           <button id="mgr-reset-btn" style="font-size:11px;padding:4px 10px;background:#e2e8f0;border:none;border-radius:4px;cursor:pointer;">統計予測を初期値にセット</button>
         </span>
@@ -3723,10 +3724,10 @@ function renderWeekly(){
 
 function renderManagerInput(wr){
   const departed = DATA.ca_status?.departed || [];
-  const cas = (DATA.kpi?.ca_names || []).filter(c => !departed.includes(c));
+  const defaultCAs = (DATA.kpi?.ca_names || []).filter(c => !departed.includes(c));
   const storageKey = `manager_input_${wr.quarter}`;
 
-  // Load saved data: { _columns: [...], 'CA名': {...} }
+  // Load saved data: { _columns: [...], _rows: [{id,name}], 'rowKey': {...} }
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch(e){}
 
@@ -3737,45 +3738,56 @@ function renderManagerInput(wr){
     {id: 'interviews', name: '面談配分', type: 'number', sumInTotal: true, isDefault: true},
   ];
   if(!saved._columns) saved._columns = [];
-  // Custom columns from saved
+  if(!saved._rows) saved._rows = [];
   const customCols = saved._columns;
+  const customRows = saved._rows;  // [{id, name}]
+
+  // All rows = default CAs + custom rows
+  // Each row item: {key, name, isDefault, color}
+  function getAllRows(){
+    const rows = defaultCAs.map(ca => ({
+      key: ca, name: ca, isDefault: true, color: CA_COLORS[ca] || '#64748b'
+    }));
+    customRows.forEach(r => {
+      rows.push({key: r.id, name: r.name, isDefault: false, color: '#64748b', isCustomRow: true});
+    });
+    return rows;
+  }
 
   // All columns to render (default + custom)
   function getAllColumns(){
     return [...DEFAULT_COLUMNS, ...customCols];
   }
 
-  // Default values from weekly_report (in 万 unit)
-  function getDefaults(){
-    const defaults = {};
-    cas.forEach(ca => {
-      const cd = wr.by_ca?.[ca] || {};
-      defaults[ca] = {
+  // Default values from weekly_report (in 万 unit) - only for default CAs
+  function getDefaults(rowKey, isDefault){
+    if(isDefault){
+      const cd = wr.by_ca?.[rowKey] || {};
+      return {
         target: Math.round((cd.q_target || 0) / 10000),
         predict: Math.round((cd.integrated_forecast || 0) / 10000),
         interviews: 0,
         status: '',
         alert: ''
       };
-    });
-    return defaults;
+    }
+    return {target: 0, predict: 0, interviews: 0, status: '', alert: ''};
   }
 
   function getCurrentData(){
-    const defaults = getDefaults();
     const data = {};
-    cas.forEach(ca => {
-      const s = saved[ca] || {};
-      data[ca] = {
-        target: s.target !== undefined ? s.target : defaults[ca].target,
-        predict: s.predict !== undefined ? s.predict : defaults[ca].predict,
-        interviews: s.interviews !== undefined ? s.interviews : defaults[ca].interviews,
+    getAllRows().forEach(r => {
+      const def = getDefaults(r.key, r.isDefault);
+      const s = saved[r.key] || {};
+      data[r.key] = {
+        target: s.target !== undefined ? s.target : def.target,
+        predict: s.predict !== undefined ? s.predict : def.predict,
+        interviews: s.interviews !== undefined ? s.interviews : def.interviews,
         status: s.status || '',
         alert: s.alert || '',
       };
-      // Custom columns
       customCols.forEach(c => {
-        data[ca][c.id] = s[c.id] !== undefined ? s[c.id] : (c.type === 'number' ? 0 : '');
+        data[r.key][c.id] = s[c.id] !== undefined ? s[c.id] : (c.type === 'number' ? 0 : '');
       });
     });
     return data;
@@ -3808,10 +3820,12 @@ function renderManagerInput(wr){
     html += '<th style="background:#fef2f2;color:#7f1d1d;">アラート（メモ）</th>';
     html += '</tr></thead><tbody>';
 
+    const allRows = getAllRows();
+
     // 合計行
     const sums = {};
     allCols.forEach(c => {
-      sums[c.id] = c.type === 'number' && c.sumInTotal ? cas.reduce((s, ca) => s + (parseFloat(data[ca][c.id])||0), 0) : null;
+      sums[c.id] = c.type === 'number' && c.sumInTotal ? allRows.reduce((s, r) => s + (parseFloat(data[r.key][c.id])||0), 0) : null;
     });
     const gapMgr = (sums.predict || 0) - (sums.target || 0);
     const gapColor = gapMgr >= 0 ? '#10b981' : '#ef4444';
@@ -3827,11 +3841,19 @@ function renderManagerInput(wr){
     });
     html += `<td><span id="mgr-gap-label" style="font-size:12px;color:#78350f;">予測${gapMgr >= 0 ? '+' : '▲'}${Math.abs(gapMgr).toLocaleString()}万 vs 目標</span></td></tr>`;
 
-    cas.forEach(ca => {
-      const d = data[ca];
-      const color = CA_COLORS[ca] || '#64748b';
-      html += `<tr data-ca="${ca}">`;
-      html += `<td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:6px;"></span>${ca}</td>`;
+    allRows.forEach(r => {
+      const d = data[r.key];
+      const rowKey = r.key;
+      html += `<tr data-row="${rowKey}">`;
+      if(r.isCustomRow){
+        html += `<td><div style="display:flex;align-items:center;gap:4px;">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${r.color};flex-shrink:0;"></span>
+          <input type="text" class="mi-row-name" value="${escapeAttr(r.name)}" placeholder="行名..." style="flex:1;min-width:0;padding:2px 4px;border:1px solid #e2e8f0;border-radius:4px;font-size:13px;">
+          <span data-del-row="${rowKey}" title="行を削除" style="color:#ef4444;font-size:13px;cursor:pointer;flex-shrink:0;">×</span>
+        </div></td>`;
+      } else {
+        html += `<td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${r.color};margin-right:6px;"></span>${r.name}</td>`;
+      }
       allCols.forEach(c => {
         const v = d[c.id];
         const w = c.type === 'number' ? 80 : 120;
@@ -3852,31 +3874,57 @@ function renderManagerInput(wr){
     document.getElementById('weekly-manager-input').innerHTML = html;
 
     // Bind events
-    document.querySelectorAll('#weekly-manager-input tr[data-ca]').forEach(row => {
-      const ca = row.dataset.ca;
-      if(!saved[ca]) saved[ca] = {};
+    document.querySelectorAll('#weekly-manager-input tr[data-row]').forEach(row => {
+      const rk = row.dataset.row;
+      if(!saved[rk]) saved[rk] = {};
 
       row.querySelectorAll('.mi-input').forEach(inp => {
         if(inp.classList.contains('mi-alert')){
           inp.addEventListener('input', e => {
-            saved[ca].alert = e.target.value;
+            saved[rk].alert = e.target.value;
             save();
           });
         } else {
           const colId = inp.dataset.col;
           inp.addEventListener('input', e => {
             const val = inp.type === 'number' ? (parseFloat(e.target.value) || 0) : e.target.value;
-            saved[ca][colId] = val;
+            saved[rk][colId] = val;
             save();
             recalcSums();
           });
         }
       });
       row.querySelector('.mi-status').addEventListener('click', e => {
-        const ns = nextStatus(saved[ca].status || '');
-        saved[ca].status = ns;
+        const ns = nextStatus(saved[rk].status || '');
+        saved[rk].status = ns;
         e.target.textContent = ns || '⚪';
         save();
+      });
+      // Custom row name editing
+      const nameInput = row.querySelector('.mi-row-name');
+      if(nameInput){
+        nameInput.addEventListener('input', e => {
+          const customRow = customRows.find(r => r.id === rk);
+          if(customRow){
+            customRow.name = e.target.value;
+            save();
+          }
+        });
+      }
+    });
+
+    // Delete custom row
+    document.querySelectorAll('[data-del-row]').forEach(el => {
+      el.addEventListener('click', e => {
+        const rk = e.target.dataset.delRow;
+        const r = customRows.find(rr => rr.id === rk);
+        if(r && confirm(`行「${r.name || '(無題)'}」を削除しますか？`)){
+          const idx = customRows.findIndex(rr => rr.id === rk);
+          customRows.splice(idx, 1);
+          if(saved[rk]) delete saved[rk];
+          save();
+          render();
+        }
       });
     });
 
@@ -3920,10 +3968,11 @@ function renderManagerInput(wr){
   function recalcSums(){
     const data = getCurrentData();
     const allCols = getAllColumns();
+    const allRows = getAllRows();
     let sumT = 0, sumP = 0;
     allCols.forEach(c => {
       if(c.type === 'number' && c.sumInTotal){
-        const sum = cas.reduce((s, ca) => s + (parseFloat(data[ca][c.id])||0), 0);
+        const sum = allRows.reduce((s, r) => s + (parseFloat(data[r.key][c.id])||0), 0);
         const el = document.getElementById('mgr-sum-' + c.id);
         if(el) el.textContent = sum.toLocaleString();
         if(c.id === 'target') sumT = sum;
@@ -3939,9 +3988,9 @@ function renderManagerInput(wr){
   }
 
   // Add column button
-  const addBtn = document.getElementById('mgr-add-col-btn');
-  if(addBtn){
-    addBtn.onclick = () => {
+  const addColBtn = document.getElementById('mgr-add-col-btn');
+  if(addColBtn){
+    addColBtn.onclick = () => {
       const name = prompt('新しい列名を入力（例: 確度UP予定数）:', '');
       if(!name) return;
       const type = confirm('数値型にしますか？ OK = 数値 / キャンセル = テキスト') ? 'number' : 'text';
@@ -3953,13 +4002,27 @@ function renderManagerInput(wr){
     };
   }
 
+  // Add row button
+  const addRowBtn = document.getElementById('mgr-add-row-btn');
+  if(addRowBtn){
+    addRowBtn.onclick = () => {
+      const name = prompt('新しい行名を入力（例: 新規入社予定者 / 特別案件 など）:', '');
+      if(name === null) return;  // cancelled
+      const id = 'row_' + Date.now();
+      customRows.push({id, name: name || '(無題)'});
+      save();
+      render();
+    };
+  }
+
   // Reset button
   const resetBtn = document.getElementById('mgr-reset-btn');
   if(resetBtn){
     resetBtn.onclick = () => {
-      if(confirm('現在の入力（追加列含む）を破棄して、統計予測の値を初期値としてセットしますか？')) {
-        saved = {_columns: []};
+      if(confirm('現在の入力（追加列・追加行含む）を破棄して、統計予測の値を初期値としてセットしますか？')) {
+        saved = {_columns: [], _rows: []};
         customCols.length = 0;
+        customRows.length = 0;
         localStorage.removeItem(storageKey);
         render();
       }
