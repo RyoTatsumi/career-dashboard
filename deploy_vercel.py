@@ -17,32 +17,43 @@ PROJECT_NAME = "hr-ca-dashboard"
 BASE = "https://api.vercel.com"
 
 # Files to deploy
-# NOTE: dashboard_data.json は GitHub Actions の毎日cronが最新を生成→Vercelにdeploy するので、
-# ローカルからは含めない（含めると古いローカルデータで本番を上書きしてしまう）。
-# データもどうしても更新したい場合は --with-data フラグを付けて実行する。
-import sys
-include_data = '--with-data' in sys.argv
-deploy_files = ["index.html"]
-if include_data:
-    deploy_files.append("data/dashboard_data.json")
-    print("⚠️  --with-data 指定: ローカルの dashboard_data.json も含めます")
-    # 最新のproduction dataを取得して、ローカルが古ければ警告
+# Vercel は各deployが独立したスナップショットになるので、
+# 必ず index.html + dashboard_data.json の両方を含める必要がある（片方欠けると404になる）
+# ローカルのデータが本番より古い場合は、まず本番のJSONを取得してローカルに上書きしてからデプロイする
+# （これによりローカルの古いデータで本番を上書きする事故を防ぐ）
+import sys, urllib.request, json as _json
+
+force_local = '--force-local-data' in sys.argv
+PROD_URL = "https://hr-ca-dashboard-ryo-tatsumis-projects.vercel.app/data/dashboard_data.json"
+
+if not force_local:
     try:
-        import urllib.request, json as _json
-        with urllib.request.urlopen("https://hr-ca-dashboard-ryo-tatsumis-projects.vercel.app/data/dashboard_data.json") as r:
+        print("📥 本番の dashboard_data.json を取得中...")
+        with urllib.request.urlopen(PROD_URL, timeout=10) as r:
             prod_data = _json.loads(r.read())
-        with open("data/dashboard_data.json") as f:
-            local_data = _json.load(f)
-        prod_gen = prod_data.get('generated_at', '')
-        local_gen = local_data.get('generated_at', '')
-        if prod_gen > local_gen:
-            print(f"⚠️  本番データ ({prod_gen}) のほうが新しい！")
-            print(f"   ローカルデータ ({local_gen}) で上書きしますか？ Ctrl+C で中断")
-            input("Enterで続行...")
-    except Exception:
-        pass
+        try:
+            with open("data/dashboard_data.json") as f:
+                local_data = _json.load(f)
+            prod_gen = prod_data.get('generated_at', '')
+            local_gen = local_data.get('generated_at', '')
+            if prod_gen > local_gen:
+                print(f"⚠️  本番 ({prod_gen}) > ローカル ({local_gen})")
+                print(f"   本番のJSONをローカルに上書きしてからデプロイします")
+                with open("data/dashboard_data.json", "w", encoding='utf-8') as f:
+                    _json.dump(prod_data, f, ensure_ascii=False, indent=2)
+                print(f"   ✅ ローカルを最新化しました")
+            else:
+                print(f"   ローカル ({local_gen}) >= 本番 ({prod_gen}) → ローカルを使用")
+        except FileNotFoundError:
+            with open("data/dashboard_data.json", "w", encoding='utf-8') as f:
+                _json.dump(prod_data, f, ensure_ascii=False, indent=2)
+            print(f"   ローカルにJSONがなかったので本番から取得しました")
+    except Exception as e:
+        print(f"⚠️  本番JSON取得失敗 ({e}) → ローカルで進めます")
 else:
-    print("ℹ️  index.html のみデプロイします（データ変更したい場合は --with-data 付けて実行）")
+    print("⚠️  --force-local-data 指定: ローカルJSONをそのままデプロイ")
+
+deploy_files = ["index.html", "data/dashboard_data.json"]
 
 # Step 1: Upload files
 print("Uploading files...")
