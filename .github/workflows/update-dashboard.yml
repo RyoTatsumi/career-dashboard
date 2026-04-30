@@ -42,15 +42,5 @@ jobs:
         if: always()
         run: rm -f service_account_key.json
 
-  # Keep workflow alive - GitHub disables cron on inactive repos after 60 days
-  keepalive:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'schedule'
-    steps:
-      - uses: actions/checkout@v5
-      - name: Keepalive commit
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit --allow-empty -m "chore: keepalive [skip ci]"
-          git push
+  # Note: keepalive job removed (was failing due to git push permissions).
+  # Daily cron is reliable as long as code commits keep happening within 60 days.

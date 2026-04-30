@@ -17,10 +17,32 @@ PROJECT_NAME = "hr-ca-dashboard"
 BASE = "https://api.vercel.com"
 
 # Files to deploy
-deploy_files = [
-    "index.html",
-    "data/dashboard_data.json",
-]
+# NOTE: dashboard_data.json は GitHub Actions の毎日cronが最新を生成→Vercelにdeploy するので、
+# ローカルからは含めない（含めると古いローカルデータで本番を上書きしてしまう）。
+# データもどうしても更新したい場合は --with-data フラグを付けて実行する。
+import sys
+include_data = '--with-data' in sys.argv
+deploy_files = ["index.html"]
+if include_data:
+    deploy_files.append("data/dashboard_data.json")
+    print("⚠️  --with-data 指定: ローカルの dashboard_data.json も含めます")
+    # 最新のproduction dataを取得して、ローカルが古ければ警告
+    try:
+        import urllib.request, json as _json
+        with urllib.request.urlopen("https://hr-ca-dashboard-ryo-tatsumis-projects.vercel.app/data/dashboard_data.json") as r:
+            prod_data = _json.loads(r.read())
+        with open("data/dashboard_data.json") as f:
+            local_data = _json.load(f)
+        prod_gen = prod_data.get('generated_at', '')
+        local_gen = local_data.get('generated_at', '')
+        if prod_gen > local_gen:
+            print(f"⚠️  本番データ ({prod_gen}) のほうが新しい！")
+            print(f"   ローカルデータ ({local_gen}) で上書きしますか？ Ctrl+C で中断")
+            input("Enterで続行...")
+    except Exception:
+        pass
+else:
+    print("ℹ️  index.html のみデプロイします（データ変更したい場合は --with-data 付けて実行）")
 
 # Step 1: Upload files
 print("Uploading files...")
