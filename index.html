@@ -469,6 +469,15 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;min-
       <div id="weekly-ca-table" style="overflow-x:auto;"></div>
     </div>
 
+    <!-- Manager Manual Input -->
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title">📝 マネージャー予測（手入力 / 統計予測の下に追加）
+        <button id="mgr-reset-btn" style="float:right;font-size:11px;padding:4px 10px;background:#e2e8f0;border:none;border-radius:4px;cursor:pointer;">統計予測を初期値にセット</button>
+      </div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:8px;">合計行は自動計算。各CAの数値・アラートを直接編集できます（ブラウザに保存）。</div>
+      <div id="weekly-manager-input" style="overflow-x:auto;"></div>
+    </div>
+
     <!-- CA-level Suggestions -->
     <div class="card" style="margin-top:20px;">
       <div class="card-title">📋 CA別 改善示唆</div>
@@ -3656,8 +3665,170 @@ function renderWeekly(){
   if(caSugsHtml === '') caSugsHtml = '<p style="color:#64748b;">該当する示唆なし</p>';
   document.getElementById('weekly-ca-suggestions').innerHTML = caSugsHtml;
 
+  // ===== Manager Manual Input =====
+  renderManagerInput(wr);
+
   // ===== Simulator =====
   setupWeeklySimulator(wr);
+}
+
+function renderManagerInput(wr){
+  const departed = DATA.ca_status?.departed || [];
+  const cas = (DATA.kpi?.ca_names || []).filter(c => !departed.includes(c));
+  const storageKey = `manager_input_${wr.quarter}`;
+
+  // Load saved data
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch(e){}
+
+  // Default values from weekly_report (in 万 unit)
+  function getDefaults(){
+    const defaults = {};
+    cas.forEach(ca => {
+      const cd = wr.by_ca?.[ca] || {};
+      defaults[ca] = {
+        target: Math.round((cd.q_target || 0) / 10000),
+        predict: Math.round((cd.integrated_forecast || 0) / 10000),
+        interviews: 0,
+        status: '',
+        alert: ''
+      };
+    });
+    return defaults;
+  }
+
+  // Merge saved + defaults
+  function getCurrentData(){
+    const defaults = getDefaults();
+    const data = {};
+    cas.forEach(ca => {
+      const s = saved[ca] || {};
+      data[ca] = {
+        target: s.target !== undefined ? s.target : defaults[ca].target,
+        predict: s.predict !== undefined ? s.predict : defaults[ca].predict,
+        interviews: s.interviews !== undefined ? s.interviews : defaults[ca].interviews,
+        status: s.status || '',
+        alert: s.alert || '',
+      };
+    });
+    return data;
+  }
+
+  const STATUS_ICONS = ['', '🔴', '🟡', '🟢', '🔵'];
+  function nextStatus(cur){
+    const i = STATUS_ICONS.indexOf(cur);
+    return STATUS_ICONS[(i + 1) % STATUS_ICONS.length];
+  }
+
+  function save(){
+    localStorage.setItem(storageKey, JSON.stringify(saved));
+  }
+
+  function render(){
+    const data = getCurrentData();
+    let html = '<table class="data-table" style="font-size:13px;"><thead><tr>';
+    html += '<th style="background:#fef2f2;color:#7f1d1d;">CA名</th>';
+    html += '<th class="num" style="background:#fef2f2;color:#7f1d1d;">目標(万)</th>';
+    html += '<th class="num" style="background:#fef2f2;color:#7f1d1d;">予測(万)</th>';
+    html += '<th class="num" style="background:#fef2f2;color:#7f1d1d;">面談配分</th>';
+    html += '<th style="background:#fef2f2;color:#7f1d1d;">アラート</th>';
+    html += '</tr></thead><tbody>';
+
+    // 合計行
+    const sumT = cas.reduce((s,c) => s + (parseFloat(data[c].target)||0), 0);
+    const sumP = cas.reduce((s,c) => s + (parseFloat(data[c].predict)||0), 0);
+    const sumI = cas.reduce((s,c) => s + (parseFloat(data[c].interviews)||0), 0);
+    const gapMgr = sumP - sumT;
+    const gapColor = gapMgr >= 0 ? '#10b981' : '#ef4444';
+    html += `<tr style="background:#fffbeb;font-weight:700;">
+      <td>合計</td>
+      <td class="num" id="mgr-sum-target">${sumT.toLocaleString()}</td>
+      <td class="num" id="mgr-sum-predict" style="color:${gapColor};">${sumP.toLocaleString()}</td>
+      <td class="num" id="mgr-sum-interviews">${sumI.toLocaleString()}</td>
+      <td><span style="font-size:12px;color:#78350f;">予測${sumP >= sumT ? '+' : '▲'}${Math.abs(gapMgr).toLocaleString()}万 vs 目標</span></td>
+    </tr>`;
+
+    cas.forEach(ca => {
+      const d = data[ca];
+      const color = CA_COLORS[ca] || '#64748b';
+      html += `<tr data-ca="${ca}">
+        <td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:6px;"></span>${ca}</td>
+        <td class="num"><input type="number" class="mi-input mi-target" value="${d.target}" style="width:80px;text-align:right;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;"></td>
+        <td class="num"><input type="number" class="mi-input mi-predict" value="${d.predict}" style="width:80px;text-align:right;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;"></td>
+        <td class="num"><input type="number" class="mi-input mi-interviews" value="${d.interviews}" style="width:60px;text-align:right;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;"></td>
+        <td>
+          <span class="mi-status" style="cursor:pointer;font-size:18px;margin-right:6px;user-select:none;" title="クリックでアイコン切替">${d.status || '⚪'}</span>
+          <input type="text" class="mi-input mi-alert" value="${d.alert.replace(/"/g,'&quot;')}" placeholder="アラートコメント..." style="width:calc(100% - 40px);padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;">
+        </td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('weekly-manager-input').innerHTML = html;
+
+    // Bind events
+    document.querySelectorAll('#weekly-manager-input tr[data-ca]').forEach(row => {
+      const ca = row.dataset.ca;
+      if(!saved[ca]) saved[ca] = {};
+
+      row.querySelector('.mi-target').addEventListener('input', e => {
+        saved[ca].target = parseFloat(e.target.value) || 0;
+        save();
+        recalcSums();
+      });
+      row.querySelector('.mi-predict').addEventListener('input', e => {
+        saved[ca].predict = parseFloat(e.target.value) || 0;
+        save();
+        recalcSums();
+      });
+      row.querySelector('.mi-interviews').addEventListener('input', e => {
+        saved[ca].interviews = parseFloat(e.target.value) || 0;
+        save();
+        recalcSums();
+      });
+      row.querySelector('.mi-alert').addEventListener('input', e => {
+        saved[ca].alert = e.target.value;
+        save();
+      });
+      row.querySelector('.mi-status').addEventListener('click', e => {
+        const ns = nextStatus(saved[ca].status || '');
+        saved[ca].status = ns;
+        e.target.textContent = ns || '⚪';
+        save();
+      });
+    });
+  }
+
+  function recalcSums(){
+    const data = getCurrentData();
+    const sumT = cas.reduce((s,c) => s + (parseFloat(data[c].target)||0), 0);
+    const sumP = cas.reduce((s,c) => s + (parseFloat(data[c].predict)||0), 0);
+    const sumI = cas.reduce((s,c) => s + (parseFloat(data[c].interviews)||0), 0);
+    const gapMgr = sumP - sumT;
+    const gapColor = gapMgr >= 0 ? '#10b981' : '#ef4444';
+    document.getElementById('mgr-sum-target').textContent = sumT.toLocaleString();
+    document.getElementById('mgr-sum-predict').textContent = sumP.toLocaleString();
+    document.getElementById('mgr-sum-predict').style.color = gapColor;
+    document.getElementById('mgr-sum-interviews').textContent = sumI.toLocaleString();
+    // Update gap label
+    const gapLabel = document.querySelector('#weekly-manager-input tbody tr:first-child td:last-child span');
+    if(gapLabel){
+      gapLabel.textContent = `予測${sumP >= sumT ? '+' : '▲'}${Math.abs(gapMgr).toLocaleString()}万 vs 目標`;
+    }
+  }
+
+  // Reset button
+  const resetBtn = document.getElementById('mgr-reset-btn');
+  if(resetBtn){
+    resetBtn.onclick = () => {
+      if(confirm('現在の入力を破棄して、統計予測の値を初期値としてセットしますか？')) {
+        saved = {};
+        localStorage.removeItem(storageKey);
+        render();
+      }
+    };
+  }
+
+  render();
 }
 
 function setupWeeklySimulator(wr){
