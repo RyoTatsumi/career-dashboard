@@ -388,7 +388,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1e293b;min-
       <div id="yomi-ca-details" style="overflow-x:auto;"></div>
     </div>
     <div class="card" style="margin-top:20px;">
-      <div class="card-title">パイプライン詳細（確度30%以上）</div>
+      <div class="card-title">パイプライン詳細（確度30%以上） — 振り返り・発表用フォーマット</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:8px;">各CAの行をクリックで展開。「📋 テキストをコピー」でGoogleドキュメントに貼り付け、[記入]部分を埋めて自分で振り返り・発表ができる運用イメージです。</div>
       <div id="yomi-pipeline-table" style="overflow-x:auto;"></div>
     </div>
   </div>
@@ -3305,62 +3306,175 @@ function renderYomi(){
   detailHtml += '</tbody></table>';
   document.getElementById('yomi-ca-details').innerHTML = detailHtml;
 
-  // --- Pipeline Detail Table (per CA, expandable) ---
+  // --- Pipeline Detail (per CA, expandable, 振り返り・発表用フォーマット) ---
+  const currentQ = DATA.current_quarter || yomi.quarter;
+  const qFullWidth = (typeof toFullWidthQ === 'function') ? toFullWidthQ(currentQ) : currentQ.replace('/','／');
+
+  // Helper: format yen as 万円 with comma, sign-aware
+  const fmtMan = (v) => {
+    const n = Math.round((parseFloat(v)||0) / 10000);
+    return n.toLocaleString() + '万円';
+  };
+  const fmtManSigned = (v) => {
+    const n = Math.round((parseFloat(v)||0) / 10000);
+    if(n >= 0) return '+' + n.toLocaleString() + '万円';
+    return '▲' + Math.abs(n).toLocaleString() + '万円';
+  };
+
   let pipeHtml = '';
-  activeCAs.forEach(ca => {
+  activeCAs.forEach((ca, caIdx) => {
     const d = yomi.by_ca[ca];
     if(!d) return;
-    const gap = (d.q_total||0) - (d.q_target||0);
-    const gapStr = gap >= 0 ? `<span style="color:#10b981">+${fmtMoney(gap)}</span>` : `<span style="color:#ef4444">▲${fmtMoney(Math.abs(gap))}</span>`;
 
-    pipeHtml += `<div style="margin-bottom:16px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">`;
-    pipeHtml += `<div style="padding:12px 16px;background:#f8fafc;display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">`;
-    pipeHtml += `<div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${CA_COLORS[ca]||'#64748b'};margin-right:8px;"></span><strong>${ca}</strong>`;
-    pipeHtml += ` <span style="color:#64748b;font-size:13px;">Q目標 ${fmtMoney(d.q_target||0)} / 着地 ${fmtMoney(d.q_total)} / Gap ${gapStr}</span></div>`;
-    pipeHtml += `<span style="color:#94a3b8;font-size:18px;">▼</span></div>`;
-    pipeHtml += `<div style="display:none;padding:0 16px 16px;">`;
+    // --- Q実績 (actual) from sales_by_ca ---
+    const qActual = DATA.sales_by_ca?.[ca]?.quarterly?.[qFullWidth]?.['実績(粗利)'] || 0;
+    const qTarget = d.q_target || 0;
+    const qTotal = d.q_total || 0;
+    const actualGap = qActual - qTarget;
+    const yomiGap = qTotal - qTarget;
+    const actualAchRate = qTarget > 0 ? Math.round(qActual / qTarget * 100) : 0;
+    const yomiAchRate = qTarget > 0 ? Math.round(qTotal / qTarget * 100) : 0;
+
+    // --- 保有アクティブ数: 応募前 / 選考中 / 内定 ---
+    let countOffer = 0, countSelection = 0;
+    [0,1,2].forEach(i => {
+      const m = d.monthly?.[i];
+      if(m && m.candidates) {
+        m.candidates.forEach(c => {
+          if(c.kakudo >= 80) countOffer++;
+          else if(c.kakudo >= 30) countSelection++;
+        });
+      }
+    });
+    const countPre = d.unscheduled_count || 0;
+    const totalActive = countOffer + countSelection + countPre;
+
+    // --- 月別ライン & アクティブ候補者変遷 ---
+    const colors = ['🔵','🟣','🟤'];
+    const monthLabels = ['当月','来月','翌々月'];
+    const monthLines = [];
+    const variationLines = [];
 
     [0,1,2].forEach(i => {
-      const m = d.monthly[i];
-      if(!m || m.count === 0) return;
-      const mLabel = yomi.q_months[i]?.label || m.label;
-      const isCurrentMonth = (i === yomi.current_month_idx);
-      const colors = ['🔵','🟣','🟤'];
-      pipeHtml += `<div style="margin-top:12px;">`;
-      pipeHtml += `<div style="font-weight:600;font-size:14px;color:#334155;margin-bottom:6px;">${colors[i]} ${isCurrentMonth?'当月':''}（${mLabel}）着地 ${m.count}名 | ${fmtMoney(m.total)}</div>`;
+      const m = d.monthly?.[i];
+      if(!m) return;
+      const mLabel = yomi.q_months?.[i]?.label || m.label || `${i+1}月`;
+      const count = m.count || 0;
+      const total = m.total || 0;
+      const kb = m.kakudo_breakdown || {};
+      const kbStr = Object.keys(kb)
+        .sort((a,b) => Number(b) - Number(a))
+        .map(k => `${k}%×${kb[k]}`)
+        .join(' ');
+      monthLines.push(`${colors[i]} ${monthLabels[i]}（${mLabel}）着地  ${count}名 | ${kbStr || '-'} | ${fmtMan(total)}`);
 
-      // Candidate list
-      if(m.candidates && m.candidates.length > 0) {
-        pipeHtml += '<div style="margin-left:16px;">';
-        m.candidates.forEach(c => {
-          const kakudoColor = c.kakudo >= 80 ? '#10b981' : c.kakudo >= 50 ? '#3b82f6' : c.kakudo >= 40 ? '#f59e0b' : '#94a3b8';
-          pipeHtml += `<div style="padding:4px 0;font-size:13px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f1f5f9;">`;
-          pipeHtml += `<span style="display:inline-block;min-width:36px;text-align:center;padding:2px 6px;border-radius:4px;background:${kakudoColor};color:white;font-size:11px;font-weight:600;">${c.kakudo}%</span>`;
-          pipeHtml += `<span style="min-width:80px;font-weight:500;">${c.name}</span>`;
-          pipeHtml += `<span style="color:#64748b;font-size:12px;">${c.status}</span>`;
-          pipeHtml += `<span style="margin-left:auto;color:#334155;">粗利${fmtMoney(c.arari)} → 期待値<strong>${fmtMoney(c.kitai_arari)}</strong></span>`;
-          pipeHtml += `</div>`;
-        });
-        pipeHtml += '</div>';
-      }
-      pipeHtml += '</div>';
+      (m.candidates || []).forEach(c => {
+        variationLines.push(`・${c.name}：◯%→◯%→${c.kakudo}%（${mLabel}着地 / ${c.status}）`);
+      });
     });
 
-    // Kakudo-up candidates
+    // --- 確度UP候補 ---
     const upCands = d.kakudo_up_candidates || [];
-    if(upCands.length > 0) {
-      pipeHtml += `<div style="margin-top:16px;padding:12px;background:#fffbeb;border-radius:8px;">`;
-      pipeHtml += `<div style="font-weight:600;font-size:13px;color:#92400e;margin-bottom:6px;">🚀 確度UP候補（40-60%）</div>`;
-      upCands.forEach(c => {
-        pipeHtml += `<div style="font-size:12px;color:#78350f;padding:2px 0;">${c.name}（${c.kakudo}%・${c.status}）</div>`;
-      });
-      pipeHtml += '</div>';
-    }
 
-    pipeHtml += '</div></div>';
+    // --- 必要決定数 (from weekly_report) と現状の決定数 (from sales_by_ca) ---
+    const wrCA = DATA.weekly_report?.by_ca?.[ca];
+    const neededDecisions = wrCA?.needed_decisions != null ? Math.round(wrCA.needed_decisions * 10) / 10 : null;
+    const actualDecisions = DATA.sales_by_ca?.[ca]?.quarterly?.[qFullWidth]?.['決定数'] || 0;
+    const totalDecisionsNeeded = neededDecisions != null ? Math.round((actualDecisions + neededDecisions) * 10) / 10 : null;
+
+    // --- Build presentation text (plain text for clipboard) ---
+    const presentLines = [
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `① Qの実績と予測 【約1分】（${ca} / ${currentQ}）`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `▼ Q実績`,
+      `・予算：${fmtMan(qActual)}実績／${fmtMan(qTarget)}目標（${fmtManSigned(actualGap)} / 実績達成率${actualAchRate}%）`,
+      `・期待値見込：${fmtMan(qTotal)}（見込達成率${yomiAchRate}%）`,
+      `・保有アクティブ数：${totalActive}名（応募前${countPre}名、選考中${countSelection}名、内定${countOffer}名）`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `② 月別着地予測 (当月 / 来月 / 翌々月) 【約3分】`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      ...monthLines,
+      ``,
+      `詳細共有:`,
+      ``,
+      `[各月ごとに 何人が・どの確度帯で・合計いくら 積み上がるか]`,
+      `[確度UP見込み（例：来月着地の50%帯◯名のうち、1名は今週中に60%に上げる想定）]`,
+      `[抱えているリスクの傾向（例：他社競合リスクが多い / 年収懸念が多い など）]`,
+      `[そのリスクをどう潰しにいくか]`,
+      ``,
+      ``,
+      `アクティブ候補者変遷（週次毎のヨミ変遷）:`,
+      ...(variationLines.length ? variationLines : ['・[該当者なし]']),
+      `※ヨミを時間軸で可視化することで実は動いていないヨミや確度が急落、急上している人を捉える`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `③ 達成に向けた必要な動き 【約5分】`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `達成に向けての不足: ${fmtManSigned(yomiGap)}（見込達成率${yomiAchRate}%）`,
+      `先週の動き結果: [記入]`,
+      `現状の課題: [記入]`,
+      `今週の行動:`,
+      `  例）月末までに ${totalDecisionsNeeded != null ? totalDecisionsNeeded : '◯'}件必要（現状${actualDecisions}件 / 残り${neededDecisions != null ? neededDecisions : '◯'}件）`,
+      `  確度UP候補: ${upCands.length}名`,
+      ...upCands.map(c => `    ・${c.name}（${c.kakudo}%・${c.status}・粗利${fmtMan(c.arari)}）`),
+      `  アクション: [記入]`,
+      `  その他の打ち手あれば: [記入]`,
+      ``,
+      `＊プロセス・長期課題はここでは共有なしでOKです。`,
+    ];
+    const presentText = presentLines.join('\n');
+
+    // --- Header summary line (collapsed view) ---
+    const headerGapStr = yomiGap >= 0
+      ? `<span style="color:#10b981">+${fmtMoney(yomiGap)}</span>`
+      : `<span style="color:#ef4444">▲${fmtMoney(Math.abs(yomiGap))}</span>`;
+
+    const textId = `yomi-present-text-${caIdx}`;
+
+    pipeHtml += `<div style="margin-bottom:16px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">`;
+    pipeHtml += `<div style="padding:12px 16px;background:#f8fafc;display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="(function(el){var n=el.nextElementSibling;n.style.display=n.style.display==='none'?'block':'none';})(this)">`;
+    pipeHtml += `<div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${CA_COLORS[ca]||'#64748b'};margin-right:8px;"></span><strong>${ca}</strong>`;
+    pipeHtml += ` <span style="color:#64748b;font-size:13px;">Q目標 ${fmtMoney(qTarget)} / 実績 ${fmtMoney(qActual)} / 見込 ${fmtMoney(qTotal)} / Gap ${headerGapStr}</span></div>`;
+    pipeHtml += `<span style="color:#94a3b8;font-size:18px;">▼</span></div>`;
+
+    pipeHtml += `<div style="display:none;padding:12px 16px 16px;">`;
+    pipeHtml += `<div style="display:flex;justify-content:flex-end;margin-bottom:8px;">`;
+    pipeHtml += `<button onclick="copyYomiPresentation('${textId}', this)" style="font-size:12px;padding:6px 14px;background:#3b82f6;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">📋 テキストをコピー（Google Doc貼り付け用）</button>`;
+    pipeHtml += `</div>`;
+    pipeHtml += `<pre id="${textId}" style="white-space:pre-wrap;font-family:'SF Mono','Menlo','Consolas',monospace;font-size:13px;line-height:1.6;background:#f8fafc;color:#1e293b;padding:16px;border-radius:8px;border:1px solid #e2e8f0;margin:0;overflow-x:auto;">${presentText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>`;
+    pipeHtml += `</div></div>`;
   });
 
   document.getElementById('yomi-pipeline-table').innerHTML = pipeHtml;
+}
+
+// Copy presentation text to clipboard, with visual feedback on the button.
+function copyYomiPresentation(textId, btn){
+  const el = document.getElementById(textId);
+  if(!el) return;
+  const text = el.textContent;
+  const done = () => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✅ コピー完了';
+    btn.style.background = '#10b981';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.background = '#3b82f6'; }, 1800);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch(e){}
+      document.body.removeChild(ta);
+    });
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch(e){}
+    document.body.removeChild(ta);
+  }
 }
 
 // ===== TAB: 週間レポート =====
