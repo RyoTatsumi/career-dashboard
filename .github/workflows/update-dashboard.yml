@@ -5,6 +5,13 @@ on:
     # 毎朝9時(JST) = 0時(UTC)に実行
     - cron: '3 0 * * *'
   workflow_dispatch:  # 手動実行も可能
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'process_data.py'
+      - 'deploy_ci.py'
+      - '.github/workflows/update-dashboard.yml'
 
 jobs:
   update:
