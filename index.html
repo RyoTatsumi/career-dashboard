@@ -3323,20 +3323,44 @@ function renderYomi(){
 
   // --- 表示対象CAのカスタマイズ（パイプライン詳細セクション専用） ---
   // 辰巳はマネージャー枠のためこの振り返りセクションでは非表示
-  // 肥後・石丸はデータがあれば必ず含める（filter漏れ防止）
+  // 肥後・石丸はパイプラインが空でも必ず含める（sales_by_caに目標がある場合）
   const PIPELINE_EXCLUDE = ['辰巳'];
   const PIPELINE_FORCE_INCLUDE = ['肥後', '石丸'];
   let pipelineCAs = activeCAs.filter(c => !PIPELINE_EXCLUDE.includes(c));
   PIPELINE_FORCE_INCLUDE.forEach(c => {
-    if(yomi.by_ca[c] && !pipelineCAs.includes(c)) pipelineCAs.push(c);
+    if(!pipelineCAs.includes(c)) {
+      // yomi.by_ca になくても sales_by_ca に目標があれば表示対象に追加
+      const hasTarget = DATA.sales_by_ca?.[c]?.quarterly?.[qFullWidth]?.['目標(粗利)'];
+      if(yomi.by_ca[c] || hasTarget) pipelineCAs.push(c);
+    }
   });
-  // 着地額の大きい順にソート
+  // 着地額の大きい順にソート（空CAは末尾）
   pipelineCAs.sort((a,b) => (yomi.by_ca[b]?.q_total||0) - (yomi.by_ca[a]?.q_total||0));
+
+  // パイプラインデータが無いCA用に空の構造を合成
+  const synthesizeEmptyCA = (ca) => {
+    const sca = DATA.sales_by_ca?.[ca]?.quarterly?.[qFullWidth] || {};
+    return {
+      q_target: sca['目標(粗利)'] || 0,
+      q_total: 0,
+      q_high_zone: 0,
+      q_low_zone: 0,
+      q_count: 0,
+      unscheduled_count: 0,
+      unscheduled_total: 0,
+      kakudo_up_candidates: [],
+      monthly: {
+        '0': { label: yomi.q_months?.[0]?.label || '当月', candidates: [], count: 0, total: 0, kakudo_breakdown: {} },
+        '1': { label: yomi.q_months?.[1]?.label || '来月', candidates: [], count: 0, total: 0, kakudo_breakdown: {} },
+        '2': { label: yomi.q_months?.[2]?.label || '翌々月', candidates: [], count: 0, total: 0, kakudo_breakdown: {} },
+      },
+      _isEmpty: true,
+    };
+  };
 
   let pipeHtml = '';
   pipelineCAs.forEach((ca, caIdx) => {
-    const d = yomi.by_ca[ca];
-    if(!d) return;
+    const d = yomi.by_ca[ca] || synthesizeEmptyCA(ca);
 
     // --- Q実績 (actual) from sales_by_ca ---
     const qActual = DATA.sales_by_ca?.[ca]?.quarterly?.[qFullWidth]?.['実績(粗利)'] || 0;
