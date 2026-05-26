@@ -3321,8 +3321,20 @@ function renderYomi(){
     return '▲' + Math.abs(n).toLocaleString() + '万円';
   };
 
+  // --- 表示対象CAのカスタマイズ（パイプライン詳細セクション専用） ---
+  // 辰巳はマネージャー枠のためこの振り返りセクションでは非表示
+  // 肥後・石丸はデータがあれば必ず含める（filter漏れ防止）
+  const PIPELINE_EXCLUDE = ['辰巳'];
+  const PIPELINE_FORCE_INCLUDE = ['肥後', '石丸'];
+  let pipelineCAs = activeCAs.filter(c => !PIPELINE_EXCLUDE.includes(c));
+  PIPELINE_FORCE_INCLUDE.forEach(c => {
+    if(yomi.by_ca[c] && !pipelineCAs.includes(c)) pipelineCAs.push(c);
+  });
+  // 着地額の大きい順にソート
+  pipelineCAs.sort((a,b) => (yomi.by_ca[b]?.q_total||0) - (yomi.by_ca[a]?.q_total||0));
+
   let pipeHtml = '';
-  activeCAs.forEach((ca, caIdx) => {
+  pipelineCAs.forEach((ca, caIdx) => {
     const d = yomi.by_ca[ca];
     if(!d) return;
 
