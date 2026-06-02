@@ -813,6 +813,30 @@ def extract_yomi_forecast(wb):
                         ca_forecasts[ca_name]['q_target'] = round(ca_q_target)
                         ca_forecasts[ca_name]['q_gap'] = round(ca_forecasts[ca_name]['q_total'] - ca_q_target)
                         ca_forecasts[ca_name]['monthly_targets'] = {k: round(v) for k, v in ca_monthly_targets.items()}
+                    else:
+                        # CA has a Q target but no pipeline candidates.
+                        # Still register them so the dashboard shows their card (with 0 pipeline).
+                        empty_monthly = {}
+                        for i, (y, m) in enumerate(q_months):
+                            empty_monthly[i] = {
+                                'year': y, 'month': m, 'label': f'{m}月',
+                                'candidates': [], 'count': 0,
+                                'high_zone_total': 0, 'low_zone_total': 0, 'total': 0,
+                                'kakudo_breakdown': {},
+                            }
+                        ca_forecasts[ca_name] = {
+                            'monthly': empty_monthly,
+                            'q_total': 0,
+                            'q_high_zone': 0,
+                            'q_low_zone': 0,
+                            'q_count': 0,
+                            'unscheduled_count': 0,
+                            'unscheduled_total': 0,
+                            'kakudo_up_candidates': [],
+                            'q_target': round(ca_q_target),
+                            'q_gap': -round(ca_q_target),
+                            'monthly_targets': {k: round(v) for k, v in ca_monthly_targets.items()},
+                        }
     except Exception as e:
         print(f"  Warning: could not read CA targets: {e}")
 
