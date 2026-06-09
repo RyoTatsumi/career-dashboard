@@ -3419,6 +3419,48 @@ function renderYomi(){
     const actualDecisions = DATA.sales_by_ca?.[ca]?.quarterly?.[qFullWidth]?.['決定数'] || 0;
     const totalDecisionsNeeded = neededDecisions != null ? Math.round((actualDecisions + neededDecisions) * 10) / 10 : null;
 
+    // --- 着地予測の根拠（A: 既存パイプライン + B: 新規獲得）データ ---
+    const pipelineForecast = wrCA?.pipeline_forecast ?? qTotal;     // A: 既存パイプライン期待値
+    const newRevPredicted = wrCA?.new_revenue_predicted ?? 0;       // B: 新規獲得想定売上
+    const integratedForecast = wrCA?.integrated_forecast ?? (pipelineForecast + newRevPredicted);
+    const integratedGap = integratedForecast - qTarget;  // 負=不足 / 正=超過（①と統一）
+    const integratedShortfall = Math.max(0, -integratedGap);  // 「いくら足りないか」（正の値）
+    const integratedAchRate = qTarget > 0 ? Math.round(integratedForecast / qTarget * 100) : 0;
+
+    const dailyPace = wrCA?.daily_interview_pace ?? 0;
+    const decisionRate = wrCA?.decision_rate ?? 0;
+    const recentInterviews = wrCA?.recent_interviews ?? 0;
+    const neededInterviews = wrCA?.needed_interviews ?? 0;
+    const fl = DATA.weekly_report?.forecast_logic || {};
+    const effectiveDays = fl.effective_days ?? null;
+    const leadTimeDays = fl.lead_time_days ?? 60;
+    const avgProfit = DATA.kpi?.profit_per_decision?.[ca] || DATA.kpi?.avg_profit || 1000000;
+
+    // 想定新規面談数・新規決定数
+    const predNewInterviews = effectiveDays != null ? Math.round(effectiveDays * dailyPace) : null;
+    const predNewDecisions = predNewInterviews != null ? Math.round(predNewInterviews * decisionRate * 10) / 10 : null;
+
+    // 確度UP上振れ余地: 40-60%帯の候補者が各+20%上がった場合の追加期待値
+    const upUpside = (d.kakudo_up_candidates || []).reduce((sum, c) => {
+      const arari = c.arari || 0;
+      return sum + arari * 0.2;  // 確度+20%想定
+    }, 0);
+
+    // 必要日次面談ペース(残期間で必要決定数を確保するためのペース)
+    const neededDailyPace = (effectiveDays != null && effectiveDays > 0 && decisionRate > 0)
+      ? Math.round(((neededDecisions || 0) / decisionRate / effectiveDays) * 100) / 100
+      : null;
+    const dailyPaceGap = neededDailyPace != null
+      ? Math.round((neededDailyPace - dailyPace) * 100) / 100
+      : null;
+
+    // 未スケジュール候補（応募前）の合計期待値
+    const unschedTotal = d.unscheduled_total || 0;
+    const unschedCount = d.unscheduled_count || 0;
+
+    const fmt1 = (v) => v == null ? '◯' : (Math.round(v * 10) / 10).toString();
+    const pct = (v) => v == null ? '◯' : Math.round(v * 1000) / 10 + '%';
+
     // --- Build presentation text (plain text for clipboard) ---
     const presentLines = [
       `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
@@ -3450,15 +3492,64 @@ function renderYomi(){
       `③ 達成に向けた必要な動き 【約5分】`,
       `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
       ``,
-      `達成に向けての不足: ${fmtManSigned(yomiGap)}（見込達成率${yomiAchRate}%）`,
-      `先週の動き結果: [記入]`,
-      `現状の課題: [記入]`,
-      `今週の行動:`,
-      `  例）月末までに ${totalDecisionsNeeded != null ? totalDecisionsNeeded : '◯'}件必要（現状${actualDecisions}件 / 残り${neededDecisions != null ? neededDecisions : '◯'}件）`,
-      `  確度UP候補: ${upCands.length}名`,
-      ...upCands.map(c => `    ・${c.name}（${c.kakudo}%・${c.status}・粗利${fmtMan(c.arari)}）`),
-      `  アクション: [記入]`,
-      `  その他の打ち手あれば: [記入]`,
+      `▼ 現状の不足`,
+      `・Q目標：${fmtMan(qTarget)} / 統合見込：${fmtMan(integratedForecast)} / Gap：${fmtManSigned(integratedGap)}（達成率${integratedAchRate}%）`,
+      ``,
+      `▼ 着地予測の根拠（A. 既存パイプライン + B. 新規獲得）`,
+      ``,
+      `【A. 既存パイプラインから】${fmtMan(pipelineForecast)}`,
+      `　・現状の期待値合計：${fmtMan(pipelineForecast)}`,
+      `　・確度UP候補${upCands.length}名（40-60%帯）の上振れ余地：+${fmtMan(upUpside)}見込み（各+20%想定）`,
+      ...(unschedCount > 0 ? [`　・未スケジュール候補${unschedCount}名（合計期待値${fmtMan(unschedTotal)}）の面談化余地`] : []),
+      ``,
+      `【B. 新規獲得から】${fmtMan(newRevPredicted)}`,
+      `　・残有効日数：${effectiveDays != null ? effectiveDays : '◯'}日（リードタイム${leadTimeDays}日想定）`,
+      `　・日次面談ペース：${fmt1(dailyPace)}件/日（過去実績）`,
+      `　・予測新規面談数：${predNewInterviews != null ? predNewInterviews : '◯'}件`,
+      `　・決定率：${pct(decisionRate)}（過去実績）`,
+      `　・予測新規決定数：${predNewDecisions != null ? predNewDecisions : '◯'}件`,
+      `　・平均粗利：${fmtMan(avgProfit)}`,
+      `　→ 想定追加売上：${fmtMan(newRevPredicted)}`,
+      ``,
+      `【A + B 統合】${fmtMan(integratedForecast)} vs 目標${fmtMan(qTarget)} → ${integratedGap >= 0 ? '超過 +' + fmtMan(integratedGap) : '不足 ▲' + fmtMan(-integratedGap)}`,
+      ``,
+      `▼ 必要アクション（残期間で揃える数）`,
+      `・必要追加決定数：${neededDecisions != null ? neededDecisions : '◯'}件（現状${actualDecisions}件 / 目標まで残${neededDecisions != null ? neededDecisions : '◯'}件）`,
+      `・必要追加面談数：${neededInterviews || '◯'}件`,
+      `・必要日次面談ペース：${neededDailyPace != null ? neededDailyPace : '◯'}件/日（現状${fmt1(dailyPace)}件/日 ${dailyPaceGap != null ? (dailyPaceGap > 0 ? '→ +' + fmt1(dailyPaceGap) + '件/日 必要' : '→ ペースOK') : ''}）`,
+      ``,
+      `▼ 達成プラン（複数施策の冗長化 — 一つ失敗しても達成できる構成に）`,
+      ``,
+      `【プラン1：既存パイプラインの引き上げ】 予想貢献：+ [記入]万円`,
+      `・単価アップ：[対象◯名・施策…記入]`,
+      `・決定率アップ施策：[書類通過率／面接通過率の改善 等]`,
+      `・個別フォロー対象（確度UP候補）：`,
+      ...(upCands.length ? upCands.map(c => `　- ${c.name}（現${c.kakudo}%・${c.status}・粗利${fmtMan(c.arari)}）→ 目標◯%・行動：[記入]`) : ['　- [該当者なし]']),
+      ``,
+      `【プラン2：新規獲得の強化】 予想貢献：+ [記入]万円`,
+      `・紹介獲得：[何件動く / いつまで / 何件面談化を狙うか]`,
+      `・面談ペースUP：現状${fmt1(dailyPace)}件/日 → 目標${neededDailyPace != null ? neededDailyPace : '◯'}件/日`,
+      `・単価戦略：[ターゲット業界／単価帯シフト]`,
+      `・決定率改善：[書類精度UP／1次通過率UP 等]`,
+      ``,
+      `【プラン3：その他の打ち手】 予想貢献：+ [記入]万円`,
+      ...(unschedCount > 0 ? [`・未スケジュール候補${unschedCount}名の面談化（合計期待値${fmtMan(unschedTotal)}）`] : []),
+      `・[紹介依頼の追加 / アプローチ強化先 / 他CAコラボ 等]`,
+      ``,
+      `▼ 期待効果サマリ（複数プランの合算で達成余裕があるか検証）`,
+      `・プラン1：+ [記入]万円`,
+      `・プラン2：+ [記入]万円`,
+      `・プラン3：+ [記入]万円`,
+      `　合計バッファ：+ [記入]万円（必要不足${fmtMan(integratedShortfall)}に対して、1プラン失敗しても達成可能か？）`,
+      ``,
+      `▼ 先週の動き結果（自己評価）`,
+      `・[計画したアクション → 実施結果 → 影響額 で記入]`,
+      ``,
+      `▼ 今週のチューニング`,
+      `・[継続] / [追加] / [変更] するアクション：[記入]`,
+      ``,
+      `▼ 現状の課題・障害`,
+      `・[市場 / 候補者 / 自身の動き 等、達成を阻害している要因]`,
       ``,
       `＊プロセス・長期課題はここでは共有なしでOKです。`,
     ];
