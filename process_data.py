@@ -535,25 +535,29 @@ def extract_yomi_forecast(wb):
     q_start_month = (current_q - 1) * 3 + 1
     q_end_month = current_q * 3
 
-    # Current Q month range
+    # ローリング3ヶ月ウィンドウ (当月 / 来月 / 翌々月)
+    # 例: 6月時点なら 6月 / 7月 / 8月 を表示する
     q_months = []
-    for m in range(q_start_month, q_end_month + 1):
-        q_months.append((current_fy, m))
+    for offset in range(3):
+        m = today.month + offset
+        y = current_fy
+        while m > 12:
+            m -= 12
+            y += 1
+        q_months.append((y, m))
 
     # Month labels
     month_labels = {}
     for i, (y, m) in enumerate(q_months):
-        if i == 0:
-            label = '当月' if today.month == m else f'{m}月'
         month_labels[(y, m)] = f'{m}月'
 
-    # Determine which month index is "current"
-    current_month_idx = today.month - q_start_month  # 0, 1, or 2
+    # 当月は常に index 0
+    current_month_idx = 0
 
     departed_cas = ['渡辺', '百瀬']
 
-    # Q start date for filtering
-    q_start_date = datetime(current_fy, q_start_month, 1)
+    # フィルタ用: 当月の初日より前の候補者(過去月の決定/着地)は除外
+    q_start_date = datetime(today.year, today.month, 1)
 
     def parse_date_ym(raw):
         """Parse a date value and return (year, month) or (None, None)."""
@@ -899,10 +903,43 @@ def build_weekly_report(yomi_forecast, sales, ca_funnel, kpi, ca_comparison, q_i
     q_progress = max(0, min(1, q_elapsed / q_total_days))
 
     # ----- Q目標 / 実績 -----
+    # まず「合計」行をフォールバックとして読み込む
     total_sales_q = sales.get('合計', {}).get('quarterly', {}).get(current_q_sales_key, {})
     q_target = total_sales_q.get('目標(粗利)', 0)
     q_actual = total_sales_q.get('実績(粗利)', 0)
     q_landing_db = total_sales_q.get('着地見込み', 0)  # スプシ上の着地見込み
+
+    # 「直メンバー」行が DB_売上管理 にある場合は、その値で q_target / q_actual を上書き
+    # (CAの管理権が及ぶ直接メンバーだけの数字を週間レポートで使う運用方針)
+    if wb is not None:
+        try:
+            ws_sm = wb['DB_売上管理']
+            # ヘッダー行(3行目)から Q列を特定
+            sm_q_col = None
+            for col in range(2, ws_sm.max_column + 1):
+                hdr = str(ws_sm.cell(3, col).value or '')
+                if current_q_sales_key in hdr:
+                    sm_q_col = col
+                    break
+            if sm_q_col:
+                # 「直メンバー」を含む行を探し、その下行と合わせて目標/実績を取得
+                for row_idx in range(4, ws_sm.max_row + 1):
+                    name_cell = str(ws_sm.cell(row_idx, 1).value or '').strip()
+                    if '直メンバー' not in name_cell:
+                        continue
+                    # この行と次行を見て「目標」「実績」を判定
+                    for ofs in range(0, 3):
+                        item = str(ws_sm.cell(row_idx + ofs, 2).value or '').strip()
+                        val = parse_number(ws_sm.cell(row_idx + ofs, sm_q_col).value)
+                        if '目標' in item and val > 0:
+                            q_target = val
+                            print(f"  ✅ 直メンバー目標 (row {row_idx+ofs}): {q_target:,.0f}")
+                        elif '実績' in item and val > 0 and 'RA' not in item:
+                            q_actual = val
+                            print(f"  ✅ 直メンバー実績 (row {row_idx+ofs}): {q_actual:,.0f}")
+                    break
+        except Exception as e:
+            print(f"  Warning: 直メンバー row lookup failed: {e}")
 
     # ----- 予測ロジック A: 既存パイプライン (ヨミ予測) -----
     pipeline_forecast = yomi_forecast.get('company', {}).get('q_total', 0)
